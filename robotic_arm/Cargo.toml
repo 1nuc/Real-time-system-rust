@@ -5,4 +5,6 @@ edition = "2024"
 
 [dependencies]
 advanced-pid = { version = "0.2.3" , default-features=false }
+float_eq = "1.0.1"
 pid = "4.0.0"
+rand = "0.9.2"
