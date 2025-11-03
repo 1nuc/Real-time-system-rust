@@ -3,13 +3,14 @@ use float_eq::float_eq;
 use std::thread;
 use std::time::Duration;
 use advanced_pid::{prelude::*, PidGain, Pid};
-#[derive(Debug)]
+use source_lib::library::Actions;
+#[derive(Debug, Default)]
 struct Actual{ 
     force: f32,
     velocity: f32,
     position: f32,
 }
-impl  Actual{
+impl Actions for Actual{
 
     fn new() -> Self{
         Self {
@@ -20,16 +21,16 @@ impl  Actual{
     }
 } 
 
-
+#[derive(Default)]
 struct Target{ 
     force: f32,
     velocity: f32,
     position: f32,
 }
-impl  Target{
+impl Actions for Target{
 
     fn new() -> Self{
-        Self {
+        Self{
             force: rand::random::<f32>(), 
             velocity: rand::random::<f32>(),
             position: rand::random::<f32>(),
