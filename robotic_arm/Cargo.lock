@@ -138,6 +138,11 @@ dependencies = [
 [[package]]
 name = "source-lib"
 version = "0.1.0"
+dependencies = [
+ "advanced-pid",
+ "float_eq",
+ "rand",
+]
 
 [[package]]
 name = "syn"
