@@ -1,6 +1,6 @@
-use crate::{Actions, Sensing};
+use crate::{Actions, Sensing, TransmissionControl};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Actual{ 
     pub force: f32,
     pub velocity: f32,
@@ -15,12 +15,12 @@ impl Actions for Actual{
             force: rand::random::<f32>(), 
             velocity: rand::random::<f32>(),
             position: rand::random::<f32>(),
-            temperature: rand::random::<f32>(),
+            temperature: rand::random_range(0.0..=100.0),
         }
     }
 } 
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Target{ 
     pub force: f32,
     pub velocity: f32,
@@ -35,25 +35,22 @@ impl Actions for Target{
             force: rand::random::<f32>(), 
             velocity: rand::random::<f32>(),
             position: rand::random::<f32>(),
-            temperature: rand::random::<f32>(),
+            temperature: rand::random_range(0.0..=100.0),
         }
     }
 } 
-
-pub struct Readings <'a>{
-    pub objects: Vec<(Target,&'a str)>,
+#[derive(Debug, Clone)]
+pub struct Readings {
+    pub objects: Vec<(Target,String)>,
     pub current_state: Actual,
 }
-
-impl<'a> Sensing <'a> for Readings <'a>{
+impl Sensing for Readings{
 
     fn assign_data(sample_data: i32 ) ->  Self{
         let mut arr= Vec::new();
-        let charsets=random_string::charsets::ALPHANUMERIC;
         for _ in 0..sample_data{
-            let defaulted_key_owned=random_string::generate_rng(0..40, &charsets);
             let index: i32= rand::random_range(0..=1);
-            arr.push((Target::new(), Self::generate_keys(index, &defaulted_key_owned)));
+            arr.push((Target::new(), Self::generate_keys(index)));
         }
         Self{
             objects:arr,
@@ -61,17 +58,30 @@ impl<'a> Sensing <'a> for Readings <'a>{
         }
 
     }
-    fn generate_keys(index: i32, defaulted_key_owned: &'a String) -> &'a str{
-        let defaulted_key: &'a str= defaulted_key_owned.as_str();
+    fn generate_keys(index: i32) -> String{
+        let charsets=random_string::charsets::ALPHANUMERIC;
+        let defaulted_key=random_string::generate_rng(0..40, charsets);
         match index{
             0 => defaulted_key,
-            1 => Self::TOKEN,
-            _=>"402ERROR",
+            1 => String::from(Self::TOKEN),
+            _=>"402ERROR".to_string(),
         }
     }
 
     fn explore(&self) {
-        println!()
+       let header= "=".repeat(30); 
+       let title="Robotic Arm Picker Readings";
+       println!("{} \n{},\n{}\n current_state:{:#?},\n Target Boxes:{:#?}", header, title,header,self.current_state,self.objects);
+    }
+
+    fn filter_noise(&self)-> Self {
+        let filtered_objects=self.objects.clone().into_iter().filter(|x|{
+            x.1==Self::TOKEN
+        }).collect();
+        Self{
+            objects: filtered_objects,
+            current_state: self.current_state,
+        }
     }
 
     fn detect_noise() {
@@ -80,5 +90,8 @@ impl<'a> Sensing <'a> for Readings <'a>{
     fn standardize_data() {
 
     }
+    fn send_packets() {
+    }
 }
+
 
