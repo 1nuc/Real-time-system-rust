@@ -9,8 +9,11 @@ pub trait PidExtended{
     // fn avoid_obstacles();
     // fn filter_noise();
 }
-pub trait Sensing{
-    fn explore();
+pub trait Sensing<'a>{
+    const TOKEN: &'a str="This.@BoxIs!!V#ALid";
+    fn assign_data(sample_boxes: i32) -> Self;
+    fn generate_keys(index: i32, defaulted_key_owned: &'a String)-> &'a str;
+    fn explore(&self);
     fn detect_noise();
     fn standardize_data();
 }
