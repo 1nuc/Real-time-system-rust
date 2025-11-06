@@ -1,4 +1,6 @@
-use std::sync::mpsc::{Sender, TryRecvError};
+use std::sync::mpsc::{Receiver, Sender, TryRecvError};
+
+use crate::sensor::ReadingType;
 
 pub mod sensor;
 pub mod actuator;
@@ -8,12 +10,12 @@ pub trait Actions{
 }
 pub trait Actuator{
     fn calculate_pid(actual: &mut f32, target: &mut f32, elapsed_mil: u64);
-    fn recieve_transmission();
+    fn recieve_transmission(sensor_recv: &Receiver<ReadingType>);
     // fn adjust();            
     // fn avoid_obstacles();
     // fn filter_noise();
 }
-pub trait Sensing{
+pub trait Sensing {
     const TOKEN: &'static str="This.@BoxIs!!V#ALid";
     fn assign_data(sample_boxes: i32) -> Self;
     fn generate_keys(index: i32)-> String;
@@ -21,10 +23,10 @@ pub trait Sensing{
     fn explore(&self);
     fn detect_noise();
     fn standardize_data();
-    fn transmit_data(&self);
+    fn transmit_data(&self, sensor_send: &Sender<ReadingTyp>);
 }
-pub trait Control<T, E>{
+pub trait Control<T>{
     fn init() -> Self;
-    fn receive_packets(&self) -> Result<T,TryRecvError>;
     fn clone(&self) -> Sender<T>;
+    fn simulation_control();
 } 

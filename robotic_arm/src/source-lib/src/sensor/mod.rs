@@ -1,6 +1,12 @@
-use std::{sync::{Arc, Mutex}, thread, time::Duration};
+use std::{sync::{mpsc::Sender, Arc, Mutex}, thread, time::Duration};
 
 use crate::{transmission_control::TransmissionChannel, Actions, Control, Sensing};
+
+#[derive(Clone, Copy)]
+pub enum ReadingType{
+    RoboticArm(Actual),
+    ObjectBoxes(Target),
+} 
 
 #[derive(Clone, Copy, Debug)]
 pub struct Actual{ 
@@ -91,35 +97,35 @@ impl Sensing for Readings{
     }
     fn standardize_data() {
     }
-    fn transmit_data(&self) {
-        let control=TransmissionChannel::init();
+    fn transmit_data(&self, sensor_send: &Sender<ReadingType>) {
         let current_state_thread=thread::Builder::new();
-        let res=control.clone();
+        let res=sensor_send.clone();
+        let current_state_arm=self.current_state.clone();
         //sending current states to the actuator
         current_state_thread.name("Current State Thread".to_string()).spawn(move || {
             println!("Sending current arm state.."); 
-            res.send(self.current_state).unwrap(); 
+            res.send(ReadingType::RoboticArm(current_state_arm)).unwrap(); 
+            drop(res);
             thread::sleep(Duration::from_secs(1));
         }).expect("failed to spawn thread");
-        drop(res);
         let objects= Arc::new(Mutex::new(self.objects.clone()));
         for _ in 0..=self.objects.len(){
-            let tx_copy=control.clone();
+            let tx_copy=sensor_send.clone();
             let packets=Arc::clone(&objects);
             thread::spawn(move ||{
-                let data=packets.lock().unwrap().clone();
+                let mut data=packets.lock().unwrap().clone();
+                //checking if the value will be empty
                 if let Some(sensor_packet)=data.pop(){
-                    tx_copy.send(sensor_packet.0).unwrap();
+                    tx_copy.send(ReadingType::ObjectBoxes(sensor_packet.0)).unwrap();
                 }
                 else {
                     println!("No more Targets..Sensor is closing");
-                    drop(data);
                 }
                 println!("Sending Target details...");
+                drop(tx_copy);
                 drop(data);
                 thread::sleep(Duration::from_secs(1));
             });
-            drop(tx_copy);
         }
     }
 }
