@@ -1,10 +1,14 @@
+use std::sync::mpsc::{TryRecvError};
+
 pub mod sensor;
 pub mod actuator;
+pub mod  transmission_control;
 pub trait Actions{
     fn new() -> Self;
 }
-pub trait PidExtended{
+pub trait Actuator{
     fn calculate_pid(actual: &mut f32, target: &mut f32, elapsed_mil: u64);
+    fn recieve_transmission();
     // fn adjust();            
     // fn avoid_obstacles();
     // fn filter_noise();
@@ -17,10 +21,10 @@ pub trait Sensing{
     fn explore(&self);
     fn detect_noise();
     fn standardize_data();
-    fn send_packets();
+    fn transmit_data(&self);
 }
-pub trait TransmissionControl {
-    fn simulation_control ();
-    // fn send_packets(packet: Readings);
-    // fn receive_packets();
+pub trait TransmissionControl<T, E>{
+    fn new() ->Self;
+    fn send_packets(&self, packet: T);
+    fn receive_packets(&self) -> Result<T,TryRecvError>;
 } 
