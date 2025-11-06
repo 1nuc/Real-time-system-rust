@@ -1,4 +1,4 @@
-use crate::{PidExtended, Actions};
+use crate::{Actuator,transmission_control::TransmissionChannel, Actions};
 use float_eq::float_eq;
 use std::thread;
 use std::time::Duration;
@@ -14,7 +14,7 @@ impl Actions for PidGain{
     }
 }
 
-impl PidExtended for Pid{
+impl Actuator for Pid{
     fn calculate_pid(actual: &mut f32, target: &mut f32, elapse_mil: u64) {   
         let gain = PidGain::new(); 
         let mut pid = Pid::new(gain.into());
@@ -32,6 +32,9 @@ impl PidExtended for Pid{
             }
             thread::sleep(Duration::from_millis(elapse_mil));
         }
+    }
+    fn recieve_transmission() {
+        
     }
 
     // fn adjust(){

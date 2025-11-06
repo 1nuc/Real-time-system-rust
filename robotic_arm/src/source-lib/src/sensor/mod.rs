@@ -1,6 +1,6 @@
 use std::{sync::{Arc, Mutex}, thread, time::Duration};
 
-use crate::{Actions,TransmissionChannel, Sensing};
+use crate::{transmission_control::TransmissionChannel, Actions, Control, Sensing};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Actual{ 
@@ -29,7 +29,7 @@ pub struct Target{
     pub position: f32,
     pub temperature: f32,
 }
-
+//define implementation for the target
 impl Actions for Target{
 
     fn new() -> Self{
@@ -92,23 +92,24 @@ impl Sensing for Readings{
     fn standardize_data() {
     }
     fn transmit_data(&self) {
-        let control=TransmissionChannel::new();
-        let tx_copy=control.txes.clone();
+        let control=TransmissionChannel::init();
         let current_state_thread=thread::Builder::new();
+        let res=control.clone();
         //sending current states to the actuator
         current_state_thread.name("Current State Thread".to_string()).spawn(move || {
             println!("Sending current arm state.."); 
-            tx_copy.send_packets(&self.current_state); 
+            res.send(self.current_state).unwrap(); 
             thread::sleep(Duration::from_secs(1));
         }).expect("failed to spawn thread");
+        drop(res);
         let objects= Arc::new(Mutex::new(self.objects.clone()));
         for _ in 0..=self.objects.len(){
-            let tx_copy=control.txes.clone();
+            let tx_copy=control.clone();
             let packets=Arc::clone(&objects);
             thread::spawn(move ||{
                 let data=packets.lock().unwrap().clone();
                 if let Some(sensor_packet)=data.pop(){
-                    tx_copy.send_packets(&sensor_packet);
+                    tx_copy.send(sensor_packet.0).unwrap();
                 }
                 else {
                     println!("No more Targets..Sensor is closing");
@@ -118,6 +119,7 @@ impl Sensing for Readings{
                 drop(data);
                 thread::sleep(Duration::from_secs(1));
             });
+            drop(tx_copy);
         }
     }
 }

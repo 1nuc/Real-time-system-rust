@@ -1,25 +1,24 @@
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
-use crate::{TransmissionControl};
+use crate::{Control};
 
 pub struct TransmissionChannel<T>{
-    txes: Sender<T>,
-    rxes: Receiver<T>,
+    pub txes: Sender<T>,
+    pub rxes: Receiver<T>,
 }
-impl <T, E> TransmissionControl<T, E> for TransmissionChannel<T>{
-    fn new()-> Self{
-        let (tx, rx) = channel();
+impl <T, E> Control<T, E> for TransmissionChannel<T>{
+    fn init()-> Self{
+        let (tx, rx) = channel::<T>();
         Self{
             txes: tx,
             rxes: rx,
         }
     } 
 
-    fn send_packets(&self,packets: T){
-       self.txes.send(packets).unwrap(); //optional for now unwrap will be deleted in the future
-                                         //and replaced by expect 
-    }
     fn receive_packets(&self) -> Result<T, TryRecvError> {
         self.rxes.try_recv()
+    }
+    fn clone(&self) -> Sender<T>{
+        self.txes.clone()
     }
 }
 

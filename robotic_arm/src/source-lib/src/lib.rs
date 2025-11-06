@@ -1,8 +1,8 @@
-use std::sync::mpsc::{TryRecvError};
+use std::sync::mpsc::{Sender, TryRecvError};
 
 pub mod sensor;
 pub mod actuator;
-pub mod  transmission_control;
+pub mod transmission_control;
 pub trait Actions{
     fn new() -> Self;
 }
@@ -23,8 +23,8 @@ pub trait Sensing{
     fn standardize_data();
     fn transmit_data(&self);
 }
-pub trait TransmissionControl<T, E>{
-    fn new() ->Self;
-    fn send_packets(&self, packet: T);
+pub trait Control<T, E>{
+    fn init() -> Self;
     fn receive_packets(&self) -> Result<T,TryRecvError>;
+    fn clone(&self) -> Sender<T>;
 } 
