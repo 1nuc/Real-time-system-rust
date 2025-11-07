@@ -1,6 +1,9 @@
-use source_lib::{actuator::*, sensor::*, transmission_control::*, Actions, Actuator, Control, Sensing};
-use advanced_pid::Pid;
+use source_lib::{transmission_control::*, Control};
+use std::hint::black_box;
+use bma_benchmark::benchmark;
 fn main() {
-    let simulation=TransmissionChannel::init();
-    simulation.simulation_control();
+    benchmark!(100, {
+        let simulation=TransmissionChannel::init();
+        simulation.simulation_control();
+    });
 }

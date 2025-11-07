@@ -1,6 +1,6 @@
 use std::{sync::{mpsc::Sender, Arc, Mutex}, thread, time::Duration};
 
-use crate::{transmission_control::TransmissionChannel, Actions, Control, Sensing};
+use crate::{Actions, Sensing};
 
 #[derive(Clone, Copy, Debug)]
 pub enum ReadingType{

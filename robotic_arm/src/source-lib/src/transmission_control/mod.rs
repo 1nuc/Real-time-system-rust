@@ -1,4 +1,4 @@
-use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use crate::{sensor::{ReadingType, Readings}, Actuator, Control, Sensing};
 use advanced_pid::{Pid};
 

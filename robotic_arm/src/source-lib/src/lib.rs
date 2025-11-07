@@ -1,4 +1,4 @@
-use std::{io::Read, sync::mpsc::{Receiver, Sender, TryRecvError}};
+use std::{sync::mpsc::{Receiver, Sender}};
 
 use crate::sensor::ReadingType;
 
