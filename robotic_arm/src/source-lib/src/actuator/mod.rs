@@ -1,6 +1,7 @@
-use crate::sensor::ReadingType;
+use crate::sensor::{self, ReadingType};
 use crate::{Actuator,transmission_control::TransmissionChannel, Actions};
 use float_eq::float_eq;
+use std::sync::mpsc::TryRecvError;
 use std::{sync::mpsc::Receiver, thread};
 use std::time::Duration;
 use advanced_pid::{prelude::*, PidGain, Pid};
@@ -34,14 +35,21 @@ impl Actuator for Pid{
             thread::sleep(Duration::from_millis(elapse_mil));
         }
     }
-    fn recieve_transmission(sensor_recv: &Receiver<ReadingType>) {
-        for recv in sensor_recv.try_recv().unwrap(){
-            match recv{
+    fn recieve_transmission(sensor_recv: Receiver<ReadingType>) {
+        loop {
+            match sensor_recv.try_recv(){
                 Ok(value) =>{
                     println!("Readings recieved...");
                     println!("{:?}", value);
-                } ,
-                Err(err) =>println!("Error occured while trying to reecieve: {err}"),
+                },
+                Err(TryRecvError::Empty)=> {
+                    println!("empty channel");
+                    thread::sleep(Duration::from_secs(1)); 
+                },
+                Err(TryRecvError::Disconnected)=> {
+                    println!("No more messages");
+                    break;
+                },
             }
         }
     }

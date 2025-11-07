@@ -1,6 +1,6 @@
-use std::{sync::{mpsc::channel, Arc, Mutex}, thread, time::Duration};
-use source_lib::{actuator::*, sensor::*, Actions,Actuator , Sensing};
+use source_lib::{actuator::*, sensor::*, transmission_control::*, Actions, Actuator, Control, Sensing};
 use advanced_pid::Pid;
 fn main() {
-    println!("hellow world");
+    let simulation=TransmissionChannel::init();
+    simulation.simulation_control();
 }

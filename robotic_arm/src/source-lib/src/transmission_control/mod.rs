@@ -1,29 +1,28 @@
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
-use crate::{sensor::Readings, Actuator, Control, Sensing};
+use crate::{sensor::{ReadingType, Readings}, Actuator, Control, Sensing};
 use advanced_pid::{Pid};
 
-pub struct TransmissionChannel<T>{
-    pub txes: Sender<T>,
-    pub rxes: Receiver<T>,
+pub struct TransmissionChannel{
+    pub txes: Sender<ReadingType>,
+    pub rxes: Receiver<ReadingType>,
 }
-impl <T> Control<T > for TransmissionChannel<T>{
+impl Control for TransmissionChannel{
     fn init()-> Self{
-        let (tx, rx) = channel::<T>();
+        let (tx, rx) = channel::<ReadingType>();
         Self{
             txes: tx,
             rxes: rx,
         }
     } 
 
-    fn clone(&self) -> Sender<T>{
+    fn clone(&self) -> Sender<ReadingType>{
         self.txes.clone()
     }
 
-    fn simulation_control(){
+    fn simulation_control(self){
         let robotic_data=Readings::assign_data(30).filter_noise();
-        let sensing_channel=TransmissionChannel::init();
-        robotic_data.transmit_data(&sensing_channel.txes);
-        Pid::recieve_transmission(&sensing_channel.rxes);
+        robotic_data.transmit_data(self.txes.clone());
+        Pid::recieve_transmission(self.rxes);
     }
 }
 

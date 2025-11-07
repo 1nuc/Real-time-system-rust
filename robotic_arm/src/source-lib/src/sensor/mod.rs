@@ -2,12 +2,11 @@ use std::{sync::{mpsc::Sender, Arc, Mutex}, thread, time::Duration};
 
 use crate::{transmission_control::TransmissionChannel, Actions, Control, Sensing};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum ReadingType{
     RoboticArm(Actual),
     ObjectBoxes(Target),
 } 
-
 #[derive(Clone, Copy, Debug)]
 pub struct Actual{ 
     pub force: f32,
@@ -97,7 +96,7 @@ impl Sensing for Readings{
     }
     fn standardize_data() {
     }
-    fn transmit_data(&self, sensor_send: &Sender<ReadingType>) {
+    fn transmit_data(&self, sensor_send: Sender<ReadingType>) {
         let current_state_thread=thread::Builder::new();
         let res=sensor_send.clone();
         let current_state_arm=self.current_state.clone();
@@ -113,7 +112,7 @@ impl Sensing for Readings{
             let tx_copy=sensor_send.clone();
             let packets=Arc::clone(&objects);
             thread::spawn(move ||{
-                let mut data=packets.lock().unwrap().clone();
+                let mut data=packets.lock().unwrap();
                 //checking if the value will be empty
                 if let Some(sensor_packet)=data.pop(){
                     tx_copy.send(ReadingType::ObjectBoxes(sensor_packet.0)).unwrap();
@@ -124,9 +123,10 @@ impl Sensing for Readings{
                 println!("Sending Target details...");
                 drop(tx_copy);
                 drop(data);
-                thread::sleep(Duration::from_secs(1));
+                thread::sleep(Duration::from_secs(2));
             });
         }
+        println!("All data has been sent");
     }
 }
 
