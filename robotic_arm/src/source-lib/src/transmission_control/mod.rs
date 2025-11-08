@@ -22,7 +22,7 @@ impl Control for TransmissionChannel{
     fn simulation_control(self){
         let robotic_data=Readings::assign_data(30).filter_noise();
         robotic_data.transmit_data(self.txes.clone());
-        Pid::recieve_transmission(self.rxes);
+        Pid::recieve_transmission(self.rxes, robotic_data.objects_num);
     }
 }
 

@@ -1,4 +1,4 @@
-use std::{sync::{mpsc::Sender, Arc, Mutex}, thread, time::Duration};
+use std::{sync::{mpsc::Sender, Arc, Mutex}, thread::{self}, time::Duration};
 
 use crate::{Actions, Sensing};
 
@@ -50,18 +50,22 @@ impl Actions for Target{
 pub struct Readings {
     pub objects: Vec<(Target,String)>,
     pub current_state: Actual,
+    pub objects_num: i32,
 }
 impl Sensing for Readings{
 
     fn assign_data(sample_data: i32 ) ->  Self{
         let mut arr= Vec::new();
+        let mut count:i32=0;
         for _ in 0..sample_data{
             let index: i32= rand::random_range(0..=1);
             arr.push((Target::new(), Self::generate_keys(index)));
+            count+=1;
         }
         Self{
             objects:arr,
             current_state: Actual::new(),
+            objects_num: count,
         }
 
     }
@@ -82,12 +86,14 @@ impl Sensing for Readings{
     }
 
     fn filter_noise(&self)-> Self {
-        let filtered_objects=self.objects.clone().into_iter().filter(|x|{
+        let filtered_objects: Vec<(Target, String)>=self.objects.clone().into_iter().filter(|x|{
             x.1==Self::TOKEN
         }).collect();
+        let up_count: i32=filtered_objects.len().try_into().unwrap();
         Self{
             objects: filtered_objects,
             current_state: self.current_state,
+            objects_num: up_count,
         }
     }
 
@@ -97,35 +103,46 @@ impl Sensing for Readings{
     fn standardize_data() {
     }
     fn transmit_data(&self, sensor_send: Sender<ReadingType>) {
-        let current_state_thread=thread::Builder::new();
+        let current_state=self.current_state;
         let res=sensor_send.clone();
-        let current_state_arm=self.current_state.clone();
         //sending current states to the actuator
-        current_state_thread.name("Current State Thread".to_string()).spawn(move || {
+        thread::Builder::new().name("Current State Thread".to_string()).spawn(move || {
             println!("Sending current arm state.."); 
-            res.send(ReadingType::RoboticArm(current_state_arm)).unwrap(); 
+            res.send(ReadingType::RoboticArm(current_state)).unwrap(); 
             drop(res);
             thread::sleep(Duration::from_secs(1));
         }).expect("failed to spawn thread");
+
         let objects= Arc::new(Mutex::new(self.objects.clone()));
         for _ in 0..=self.objects.len(){
             let tx_copy=sensor_send.clone();
             let packets=Arc::clone(&objects);
             thread::spawn(move ||{
-                let mut data=packets.lock().unwrap();
+                let mut data=packets.lock().expect("error while locking");
                 //checking if the value will be empty
-                if let Some(sensor_packet)=data.pop(){
-                    tx_copy.send(ReadingType::ObjectBoxes(sensor_packet.0)).unwrap();
+                match data.pop(){
+                    Some(value) =>{
+                        match tx_copy.send(ReadingType::ObjectBoxes(value.0)){
+                          Ok(_)=>{
+                            println!("Sending Target details...");
+                            drop(tx_copy);
+                            drop(data);
+                            thread::sleep(Duration::from_secs(2));
+                          }, 
+                          Err(_) =>{
+                              println!("error while sending, thread run into fail safe mode...");
+                          }
+                        }
+                    },
+                    None =>{
+                        drop(tx_copy);
+                        drop(data);
+                        println!("No more Targets..Sensor is closing");
+                    },
                 }
-                else {
-                    println!("No more Targets..Sensor is closing");
-                }
-                println!("Sending Target details...");
-                drop(tx_copy);
-                drop(data);
-                thread::sleep(Duration::from_secs(2));
             });
         }
+        drop(sensor_send);
         println!("All data has been sent");
     }
 }

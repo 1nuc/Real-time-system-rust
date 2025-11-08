@@ -1,6 +1,7 @@
 use crate::sensor::{ReadingType};
 use crate::{Actuator,Actions};
 use float_eq::float_eq;
+use std::sync::mpsc::TryRecvError;
 use std::{sync::mpsc::Receiver, thread};
 use std::time::Duration;
 use advanced_pid::{prelude::*, PidGain, Pid};
@@ -34,13 +35,39 @@ impl Actuator for Pid{
             thread::sleep(Duration::from_millis(elapse_mil));
         }
     }
-    fn recieve_transmission(sensor_recv: Receiver<ReadingType>) {
-        for recv in sensor_recv.try_iter(){
-            println!("Readings recieved...");
-            println!("{:?}", recv);
+    fn recieve_transmission(sensor_recv: Receiver<ReadingType>, counts: i32) {
+        let mut singals_vector: Vec<ReadingType>=Vec::new();
+        let mut recv_counts=0;
+        loop{
+            if recv_counts -counts ==1{
+                println!("all data have been recieved");
+                break;
+            }
+            match sensor_recv.try_recv(){
+                Ok(value) => {
+                    println!("Readings recieved...");
+                    Self::process_singals(&mut singals_vector,&value);
+                    recv_counts+=1;
+                },
+                Err(TryRecvError::Empty)=> {
+                    println!("Error in channel receiption: channel is empty");
+                },
+                Err(TryRecvError::Disconnected) => println!("channel reciever is disconnected"),
+            }
         }
+        // I prefer to use this method as there is an error introduced
+        // for recv in sensor_recv.try_iter(){
+            // println!("Readings recieved...");
+            // println!("{:?}", recv);
+        // }
+        println!("Sent: {counts}, recieved: {recv_counts}");
     }
 
+    fn process_singals(signals_vector: &mut Vec<ReadingType>,data: &ReadingType){
+        signals_vector.push(*data); //storing the value into a vector for storage purposes and for
+                                    //future use
+        println!("Actuator is processing the target :{:?}",data);
+    }
     // fn adjust(){
 
 }
