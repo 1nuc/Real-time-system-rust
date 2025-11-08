@@ -127,7 +127,7 @@ impl Sensing for Readings{
                             println!("Sending Target details...");
                             drop(tx_copy);
                             drop(data);
-                            thread::sleep(Duration::from_secs(2));
+                            thread::sleep(Duration::from_millis(1));
                           }, 
                           Err(_) =>{
                               println!("error while sending, thread run into fail safe mode...");

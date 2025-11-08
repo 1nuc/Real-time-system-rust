@@ -11,7 +11,7 @@ pub trait Actions{
 pub trait Actuator{
     fn calculate_pid(actual: &mut f32, target: &mut f32, elapsed_mil: u64);
     fn recieve_transmission(sensor_recv: Receiver<ReadingType>, counts: i32);
-    fn process_singals(signals_vector: &mut Vec<ReadingType>,data: &ReadingType);
+    fn process_singals(signals_vector: &mut Vec<ReadingType>,data: &ReadingType, recv_counts: i32);
     // fn adjust();            
     // fn avoid_obstacles();
     // fn filter_noise();
