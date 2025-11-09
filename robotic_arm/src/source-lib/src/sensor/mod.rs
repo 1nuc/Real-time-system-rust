@@ -125,7 +125,6 @@ impl Sensing for Readings{
                         match tx_copy.send(ReadingType::ObjectBoxes(value.0)){
                           Ok(_)=>{
                             println!("Sending Target details...");
-                            drop(tx_copy);
                             drop(data);
                             thread::sleep(Duration::from_millis(1));
                           }, 
@@ -142,7 +141,6 @@ impl Sensing for Readings{
                 }
             });
         }
-        drop(sensor_send);
         println!("All data has been sent");
     }
 }

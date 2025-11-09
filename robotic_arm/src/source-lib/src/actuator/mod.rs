@@ -1,7 +1,9 @@
 use crate::sensor::{Actual, ReadingType, Target};
 use crate::{Actuator,Actions};
 use float_eq::float_eq;
+use std::io::Read;
 use std::sync::mpsc::TryRecvError;
+use std::thread::current;
 use std::{sync::mpsc::Receiver, thread};
 use std::time::Duration;
 use advanced_pid::{prelude::*, PidGain, Pid};
@@ -38,51 +40,60 @@ impl Actuator for Pid{
     fn recieve_transmission(sensor_recv: Receiver<ReadingType>, counts: i32) {
         let mut singals_vector: Vec<ReadingType>=Vec::new();
         let mut recv_counts: i32=0;
-        // loop{
-        //     if recv_counts -counts ==1{
-        //         println!("all data have been recieved");
-        //         break;
-        //     }
-        //     match sensor_recv.try_recv(){
-        //         Ok(value) => {
-        //             println!("Readings recieved...");
-        //             Self::process_singals(&mut singals_vector,&value, recv_counts);
-        //             recv_counts+=1;
-        //         },
-        //         Err(TryRecvError::Empty)=> {
-        //             println!("Error in channel receiption: channel is empty");
-        //         },
-        //         Err(TryRecvError::Disconnected) => println!("channel reciever is disconnected"),
-        //     }
-        // }
-        // I prefer to use this method as there is an error introduced
-        for recv in sensor_recv.try_iter(){
-            println!("Readings recieved...");
-            println!("{:?}", recv);
-            recv_counts+=1;
+        loop{
+            if recv_counts -counts ==1{
+                println!("all data have been recieved");
+                break;
+            }
+            match sensor_recv.try_recv(){
+                Ok(value) => {
+                    println!("Readings recieved...");
+                    Self::process_singals(&mut singals_vector,&value, recv_counts);
+                    recv_counts+=1;
+                },
+                Err(TryRecvError::Empty)=> {
+                    println!("Error in channel receiption: channel is empty");
+                },
+                Err(TryRecvError::Disconnected) => println!("channel reciever is disconnected"),
+            }
         }
+        // I prefer to use this method as there is an error introduced
+        // for recv in sensor_recv.try_iter(){
+        //     println!("Readings recieved...");
+        //     println!("{:?}", recv);
+        //     recv_counts+=1;
+        // }
         println!("Sent: {counts}, recieved: {recv_counts}");
     }
 
     fn process_singals(signals_vector: &mut Vec<ReadingType>,data: &ReadingType, recv_counts: i32){
-        // let mut current_arm_status:ReadingType;
-        // let mut object_status: ReadingType;
-        // if recv_counts ==0{
-        //     current_arm_status=ReadingType::RoboticArm(*data);
-        // }
-        // else if recv_counts >= 1{
-        //     object_status= ReadingType::ObjectBoxes(*data);
-        // }
         signals_vector.push(*data); //storing the value into a vector for storage purposes and for
                                     //future use
+        let current_arm_status:Option<ReadingType>;
+        let object_status: Option<ReadingType>;
+        if let ReadingType::RoboticArm(actual)=*data{
+            current_arm_status=Some(ReadingType::RoboticArm(actual));
+        }else{
+            current_arm_status=None;
+        }
+
+        if let ReadingType::ObjectBoxes(target)=*data{
+            object_status=Some(ReadingType::ObjectBoxes(target));
+       }
+        else{
+            object_status=None;
+        }
         println!("Actuator is processing the target :{:?}",data);
         //TODO: processing Position
-        // if Some(current_arm_status)& Some(object_status){
-        //     Self::calculate_pid(&mut current_arm_status.position, &mut object_status.position, 10);
-        // } 
+        if let(Some(ReadingType::RoboticArm(mut arm)), Some(ReadingType::ObjectBoxes(mut object))) = (current_arm_status, object_status){
+                Pid::calculate_pid(&mut arm.position,&mut object.position, 100);
         //TODO: processing Temparture
+                Pid::calculate_pid(&mut arm.temperature,&mut object.temperature, 100);
         //TODO: processing Force
+                Pid::calculate_pid(&mut arm.force,&mut object.force, 100);
         //TODO: processing Velocity
+                Pid::calculate_pid(&mut arm.velocity,&mut object.velocity, 100);
+        }
     }
     // fn adjust(){
 
