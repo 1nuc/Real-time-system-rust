@@ -1,7 +1,8 @@
 use crate::sensor::{Actual, ReadingType, Target};
 use crate::{Actuator,Actions};
 use float_eq::float_eq;
-use std::sync::mpsc::TryRecvError;
+use std::sync::mpsc::{RecvError, TryRecvError};
+use std::sync::Arc;
 use std::{sync::mpsc::Receiver, thread};
 use std::time::Duration;
 use advanced_pid::{prelude::*, PidGain, Pid};
@@ -36,27 +37,30 @@ impl Actuator for Pid{
         }
     }
     fn recieve_transmission(sensor_recv: Receiver<ReadingType>, counts: i32) {
-        let mut singals_vector: Vec<ReadingType>=Vec::new();
+        let singals_vector=Arc::new(Vec::new());
         let mut recv_counts: i32=0;
         loop{
             if recv_counts ==counts{
                 println!("all data have been recieved");
                 break;
             }
-            match sensor_recv.try_recv(){
+            let vector=Arc::clone(&singals_vector);
+            match sensor_recv.recv(){
                 Ok(value) => {
                     println!("Readings recieved...");
                     //no need to reference the value is the the enum implements copy
-                    if let ReadingType::RoboticArm(arm, object)=value {
-                        Self::process_singals(&mut singals_vector,&value, arm, object);
-                    }
+                    thread::spawn(move || {
+                        let ReadingType::RoboticArm(arm, object)=value;
+                        Self::process_singals(vector.to_vec(),&value, arm, object);
+                    });
+                    
                     recv_counts+=1;
                 },
-                Err(TryRecvError::Empty)=> {
+                Err(RecvError)=> {
                     println!("Error in channel receiption: channel is empty");
                     //TODO: Some logic should be made to avoid channel collapse
                 },
-                Err(TryRecvError::Disconnected) => println!("channel reciever is disconnected"),
+                // Err(TryRecvError::Disconnected) => println!("channel reciever is disconnected"),
             }
         }
         // I prefer to use this method as there is an error introduced
@@ -68,7 +72,7 @@ impl Actuator for Pid{
         println!("Sent: {counts}, recieved: {recv_counts}");
     }
 
-    fn process_singals(signals_vector: &mut Vec<ReadingType>,data: &ReadingType, mut current_arm_status: Actual, mut object_status: Target){
+    fn process_singals(mut signals_vector: Vec<ReadingType>,data: &ReadingType, mut current_arm_status: Actual, mut object_status: Target){
         signals_vector.push(*data); //storing the value into a vector for storage purposes and for
                                     //future use
         println!("Actuator is processing the target :{:?}",data);
