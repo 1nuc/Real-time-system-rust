@@ -1,7 +1,6 @@
 use std::{sync::mpsc::{Receiver, Sender}};
 
-use crate::sensor::{ReadingType};
-
+use crate::sensor::{ReadingType, Target, Actual};
 pub mod sensor;
 pub mod actuator;
 pub mod transmission_control;
@@ -11,7 +10,7 @@ pub trait Actions{
 pub trait Actuator{
     fn calculate_pid(actual: &mut f32, target: &mut f32, elapsed_mil: u64);
     fn recieve_transmission(sensor_recv: Receiver<ReadingType>, counts: i32);
-    fn process_singals(signals_vector: &mut Vec<ReadingType>,data: &ReadingType,current_arm_status: Option<ReadingType>, object_status: Option<ReadingType>);
+    fn process_singals(signals_vector: &mut Vec<ReadingType>,data: &ReadingType, current_arm_status: Actual, object_status: Target);
     // fn adjust();            
     // fn avoid_obstacles();
     // fn filter_noise();

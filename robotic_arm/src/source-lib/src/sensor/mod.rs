@@ -4,8 +4,7 @@ use crate::{Actions, Sensing};
 
 #[derive(Clone, Copy, Debug)]
 pub enum ReadingType{
-    RoboticArm(Actual),
-    ObjectBoxes(Target),
+    RoboticArm(Actual, Target),
 } 
 #[derive(Clone, Copy, Debug)]
 pub struct Actual{ 
@@ -103,26 +102,16 @@ impl Sensing for Readings{
     fn standardize_data() {
     }
     fn transmit_data(&self, sensor_send: Sender<ReadingType>) {
-        let current_state=self.current_state;
-        let res=sensor_send.clone();
-        //sending current states to the actuator
-        thread::Builder::new().name("Current State Thread".to_string()).spawn(move || {
-            println!("Sending current arm state.."); 
-            res.send(ReadingType::RoboticArm(current_state)).unwrap(); 
-            drop(res);
-            thread::sleep(Duration::from_secs(1));
-        }).expect("failed to spawn thread");
-
-        let objects= Arc::new(Mutex::new(self.objects.clone()));
+        let sensing_info= Arc::new(Mutex::new((self.current_state.clone(), self.objects.clone())));
         for _ in 0..=self.objects.len(){
             let tx_copy=sensor_send.clone();
-            let packets=Arc::clone(&objects);
+            let packets=Arc::clone(&sensing_info);
             thread::spawn(move ||{
                 let mut data=packets.lock().expect("error while locking");
                 //checking if the value will be empty
-                match data.pop(){
+                match data.1.pop(){
                     Some(value) =>{
-                        match tx_copy.send(ReadingType::ObjectBoxes(value.0)){
+                        match tx_copy.send(ReadingType::RoboticArm(data.0,value.0)){
                           Ok(_)=>{
                             println!("Sending Target details...");
                             drop(data);
@@ -130,6 +119,9 @@ impl Sensing for Readings{
                           }, 
                           Err(_) =>{
                               println!("error while sending, thread run into fail safe mode...");
+                              //TODO: Implementing fault tolerance mechanism Options:
+                              //1. Checkpoints
+                              //2. more concrete fail safe mode function 
                           }
                         }
                     },
