@@ -141,6 +141,7 @@ impl Sensing for Readings{
                 }
             });
         }
+        drop(sensor_send);
         println!("All data has been sent");
     }
 }

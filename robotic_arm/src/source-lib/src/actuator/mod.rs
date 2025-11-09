@@ -31,7 +31,7 @@ impl Actuator for Pid{
             println!("Current Readings Measurement: {actual}, : {target}");
             // Sleep 100ms
 
-            if float_eq!(actual, target, abs<= 0.00000_1){
+            if float_eq!(actual, target, abs<= 0.00_1){
                 break;
             }
             thread::sleep(Duration::from_millis(elapse_mil));
@@ -40,6 +40,7 @@ impl Actuator for Pid{
     fn recieve_transmission(sensor_recv: Receiver<ReadingType>, counts: i32) {
         let mut singals_vector: Vec<ReadingType>=Vec::new();
         let mut recv_counts: i32=0;
+        let mut current_arm_status:Option<ReadingType>= None;
         loop{
             if recv_counts -counts ==1{
                 println!("all data have been recieved");
@@ -48,7 +49,15 @@ impl Actuator for Pid{
             match sensor_recv.try_recv(){
                 Ok(value) => {
                     println!("Readings recieved...");
-                    Self::process_singals(&mut singals_vector,&value, recv_counts);
+                    let object_status: Option<ReadingType>;
+                    //no need to reference the value is the the enum implements copy
+                    if let ReadingType::RoboticArm(actual)=value{
+                        current_arm_status=Some(ReadingType::RoboticArm(actual));
+                    }
+                    if let ReadingType::ObjectBoxes(target)=value{
+                        object_status=Some(ReadingType::ObjectBoxes(target));
+                        Self::process_singals(&mut singals_vector,&value, current_arm_status, object_status);
+                   }
                     recv_counts+=1;
                 },
                 Err(TryRecvError::Empty)=> {
@@ -66,33 +75,25 @@ impl Actuator for Pid{
         println!("Sent: {counts}, recieved: {recv_counts}");
     }
 
-    fn process_singals(signals_vector: &mut Vec<ReadingType>,data: &ReadingType, recv_counts: i32){
+    fn process_singals(signals_vector: &mut Vec<ReadingType>,data: &ReadingType, current_arm_status: Option<ReadingType>, object_status: Option<ReadingType>){
         signals_vector.push(*data); //storing the value into a vector for storage purposes and for
                                     //future use
-        let current_arm_status:Option<ReadingType>;
-        let object_status: Option<ReadingType>;
-        if let ReadingType::RoboticArm(actual)=*data{
-            current_arm_status=Some(ReadingType::RoboticArm(actual));
-        }else{
-            current_arm_status=None;
-        }
-
-        if let ReadingType::ObjectBoxes(target)=*data{
-            object_status=Some(ReadingType::ObjectBoxes(target));
-       }
-        else{
-            object_status=None;
-        }
         println!("Actuator is processing the target :{:?}",data);
-        //TODO: processing Position
+    //TODO: processing Position
         if let(Some(ReadingType::RoboticArm(mut arm)), Some(ReadingType::ObjectBoxes(mut object))) = (current_arm_status, object_status){
-                Pid::calculate_pid(&mut arm.position,&mut object.position, 100);
-        //TODO: processing Temparture
-                Pid::calculate_pid(&mut arm.temperature,&mut object.temperature, 100);
-        //TODO: processing Force
-                Pid::calculate_pid(&mut arm.force,&mut object.force, 100);
-        //TODO: processing Velocity
-                Pid::calculate_pid(&mut arm.velocity,&mut object.velocity, 100);
+            println!("calculate_pid");
+            Pid::calculate_pid(&mut arm.position,&mut object.position, 1);
+    //TODO: processing Temparture
+    //         println!("calculate_pid");
+    //         Pid::calculate_pid(&mut arm.temperature,&mut object.temperature, 1);
+    // //TODO: processing Force
+    //         println!("calculate_pid");
+    //         Pid::calculate_pid(&mut arm.force,&mut object.force, 1);
+    // //TODO: processing Velocity
+    //         println!("calculate_pid");
+    //         Pid::calculate_pid(&mut arm.velocity,&mut object.velocity, 1);
+        }else{
+            println!("values never received properly: arm :{:?}, boxes: {:?}", current_arm_status, object_status);
         }
     }
     // fn adjust(){
