@@ -1,6 +1,6 @@
 use std::{sync::{mpsc::Sender, Arc, Mutex}, thread::{self}, time::Duration};
 
-use crate::{Actions, Sensing};
+use crate::{Actions, Sensing, Shared};
 
 #[derive(Clone, Copy, Debug)]
 pub enum ReadingType{
@@ -51,8 +51,10 @@ pub struct Readings {
     pub current_state: Actual,
     pub objects_num: i32,
 }
+impl Shared for Readings{
+    type SharedLock= Arc<Mutex<(Actual,Vec<(Target,String)>)>>;
+}
 impl Sensing for Readings{
-
     fn assign_data(sample_data: i32 ) ->  Self{
         let mut arr= Vec::new();
         let mut count:i32=0;
@@ -101,8 +103,7 @@ impl Sensing for Readings{
     }
     fn standardize_data() {
     }
-    fn transmit_data(&self, sensor_send: Sender<ReadingType>) {
-        let sensing_info= Arc::new(Mutex::new((self.current_state.clone(), self.objects.clone())));
+    fn transmit_data(&self, sensing_info: Self::SharedLock, sensor_send: Sender<ReadingType>) {
         for _ in 0..=self.objects.len(){
             let tx_copy=sensor_send.clone();
             let packets=Arc::clone(&sensing_info);

@@ -1,8 +1,8 @@
 use crate::sensor::{Actual, ReadingType, Target};
-use crate::{Actuator,Actions};
+use crate::{Actions, Actuator, Shared};
 use float_eq::float_eq;
 use std::sync::mpsc::{RecvError, TryRecvError};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::{sync::mpsc::Receiver, thread};
 use std::time::Duration;
 use advanced_pid::{prelude::*, PidGain, Pid};
@@ -17,6 +17,9 @@ impl Actions for PidGain{
     }
 }
 
+impl Shared for Pid{
+    type SharedLock= Arc<Mutex<(Actual,Vec<(Target,String)>)>>;
+}
 impl Actuator for Pid{
     fn calculate_pid(actual: &mut f32, target: &mut f32, elapse_mil: u64) {   
         let gain = PidGain::new(); 
@@ -36,7 +39,7 @@ impl Actuator for Pid{
             thread::sleep(Duration::from_millis(elapse_mil));
         }
     }
-    fn recieve_transmission(sensor_recv: Receiver<ReadingType>, counts: i32) {
+    fn recieve_transmission(sensing_info: Self::SharedLock,sensor_recv: Receiver<ReadingType>, counts: i32) {
         let singals_vector=Arc::new(Vec::new());
         let mut recv_counts: i32=0;
         loop{
@@ -45,13 +48,15 @@ impl Actuator for Pid{
                 break;
             }
             let vector=Arc::clone(&singals_vector);
+            let receiver_lock=Arc::clone(&sensing_info);
             match sensor_recv.recv(){
                 Ok(value) => {
                     println!("Readings recieved...");
                     //no need to reference the value is the the enum implements copy
                     thread::spawn(move || {
+                        let lock=receiver_lock.lock().unwrap();
                         let ReadingType::RoboticArm(arm, object)=value;
-                        Self::process_singals(vector.to_vec(),&value, arm, object);
+                        Self::process_singals(receiver_lock, vector.to_vec(),&value, arm, object);
                     });
                     
                     recv_counts+=1;
@@ -72,22 +77,23 @@ impl Actuator for Pid{
         println!("Sent: {counts}, recieved: {recv_counts}");
     }
 
-    fn process_singals(mut signals_vector: Vec<ReadingType>,data: &ReadingType, mut current_arm_status: Actual, mut object_status: Target){
-        signals_vector.push(*data); //storing the value into a vector for storage purposes and for
+    fn process_singals<T>(lock: Mutex<T>,signals_vector: Vec<ReadingType>,data: &ReadingType, mut current_arm_status: Actual, mut object_status: Target){
+        // *signals_vector.push(*data); //storing the value into a vector for storage purposes and for
                                     //future use
         println!("Actuator is processing the target :{:?}",data);
-    //TODO: processing Position
-            println!("calculate_pid");
-            Pid::calculate_pid(&mut current_arm_status.position,&mut object_status.position, 1);
-    //TODO: processing Temparture
-    //         println!("calculate_pid");
-    //         Pid::calculate_pid(&mut arm.temperature,&mut object.temperature, 1);
-    // //TODO: processing Force
-    //         println!("calculate_pid");
-    //         Pid::calculate_pid(&mut arm.force,&mut object.force, 1);
-    // //TODO: processing Velocity
-    //         println!("calculate_pid");
-    //         Pid::calculate_pid(&mut arm.velocity,&mut object.velocity, 1);
+//TODO: processing Position
+        println!("calculate_pid");
+        drop(lock);
+        Pid::calculate_pid(&mut current_arm_status.position,&mut object_status.position,1);
+//TODO: processing Temparture
+//         println!("calculate_pid");
+//         Pid::calculate_pid(&mut arm.temperature,&mut object.temperature, 1);
+// //TODO: processing Force
+//         println!("calculate_pid");
+//         Pid::calculate_pid(&mut arm.force,&mut object.force, 1);
+// //TODO: processing Velocity
+//         println!("calculate_pid");
+//         Pid::calculate_pid(&mut arm.velocity,&mut object.velocity, 1);
     }
     // fn adjust(){
 
