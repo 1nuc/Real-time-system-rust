@@ -2,7 +2,7 @@ use crate::sensor::{Actual, ReadingType, Target};
 use crate::{Actions, Actuator, Shared};
 use float_eq::float_eq;
 use std::sync::mpsc::{RecvError, TryRecvError};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::{sync::mpsc::Receiver, thread};
 use std::time::Duration;
 use advanced_pid::{prelude::*, PidGain, Pid};
@@ -56,7 +56,7 @@ impl Actuator for Pid{
                     thread::spawn(move || {
                         let lock=receiver_lock.lock().unwrap();
                         let ReadingType::RoboticArm(arm, object)=value;
-                        Self::process_singals(receiver_lock, vector.to_vec(),&value, arm, object);
+                        Self::process_singals(lock, vector.to_vec(),&value, arm, object);
                     });
                     
                     recv_counts+=1;
@@ -65,6 +65,7 @@ impl Actuator for Pid{
                     println!("Error in channel receiption: channel is empty");
                     //TODO: Some logic should be made to avoid channel collapse
                 },
+                // Err(TryRecvError::Disconnected) => println!("Channel disconnected"),
                 // Err(TryRecvError::Disconnected) => println!("channel reciever is disconnected"),
             }
         }
@@ -77,7 +78,7 @@ impl Actuator for Pid{
         println!("Sent: {counts}, recieved: {recv_counts}");
     }
 
-    fn process_singals<T>(lock: Mutex<T>,signals_vector: Vec<ReadingType>,data: &ReadingType, mut current_arm_status: Actual, mut object_status: Target){
+    fn process_singals<T>(lock: MutexGuard<T>,_signals_vector: Vec<ReadingType>,data: &ReadingType, mut current_arm_status: Actual, mut object_status: Target){
         // *signals_vector.push(*data); //storing the value into a vector for storage purposes and for
                                     //future use
         println!("Actuator is processing the target :{:?}",data);
