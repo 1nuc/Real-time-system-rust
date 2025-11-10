@@ -1,3 +1,1 @@
-robotic_arm/target/*
-robotic_arm/src/source-lib/target/*
-
+**/target/
