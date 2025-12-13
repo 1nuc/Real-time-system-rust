@@ -1,4 +1,4 @@
-use std::{sync::{mpsc::Sender, Arc, Mutex}, thread::{self}, time::Duration};
+use std::{sync::{mpsc::{Sender, Receiver}, Arc, Mutex}, thread::{self}, time::Duration};
 
 use crate::{Actions, Sensing, Shared};
 
@@ -103,20 +103,19 @@ impl Sensing for Readings{
     }
     fn standardize_data() {
     }
-    fn transmit_data(&self, sensing_info: Self::SharedLock, sensor_send: Sender<ReadingType>) {
+    fn transmit_data(&self, sensing_info: Self::SharedLock, sensor_send: Sender<ReadingType>, feedback_recv: Receiver<ReadingType>) {
         for _ in 0..=self.objects.len(){
             let tx_copy=sensor_send.clone();
             let packets=Arc::clone(&sensing_info);
             thread::spawn(move ||{
                 let mut data=packets.lock().expect("error while locking");
-                //checking if the value will be empty
                 match data.1.pop(){
                     Some(value) =>{
                         match tx_copy.send(ReadingType::RoboticArm(data.0,value.0)){
                           Ok(_)=>{
                             println!("Sending Target details...");
                             drop(data);
-                            thread::sleep(Duration::from_millis(1));
+                            thread::sleep(Duration::from_millis(100));
                           }, 
                           Err(_) =>{
                               println!("error while sending, thread run into fail safe mode...");

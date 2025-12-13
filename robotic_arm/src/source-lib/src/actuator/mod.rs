@@ -2,8 +2,8 @@ use crate::sensor::{Actual, ReadingType, Target};
 use crate::{Actions, Actuator, Shared};
 use float_eq::float_eq;
 use std::sync::mpsc::{RecvError, TryRecvError};
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::{sync::mpsc::Receiver, thread};
+use std::sync::{Arc, Mutex, MutexGuard, atomic::{AtomicI32, Ordering}};
+use std::{sync::mpsc::{Receiver, Sender}, thread};
 use std::time::Duration;
 use advanced_pid::{prelude::*, PidGain, Pid};
 
@@ -18,10 +18,11 @@ impl Actions for PidGain{
 }
 
 impl Shared for Pid{
+    // defining the type of the lock for the implementation of this struct
     type SharedLock= Arc<Mutex<(Actual,Vec<(Target,String)>)>>;
 }
-impl Actuator for Pid{
-    fn calculate_pid(actual: &mut f32, target: &mut f32, elapse_mil: u64) {   
+impl<'a> Actuator<'a> for Pid{
+    fn calculate_pid(actual: &mut f32, target: &mut f32, elapse_mil: u64, measurement: &'a str) {   
         let gain = PidGain::new(); 
         let mut pid = Pid::new(gain.into());
         let dt = 0.1;
@@ -30,36 +31,35 @@ impl Actuator for Pid{
             let output = pid.update(*target, *actual, dt);
 
             *actual += (output - *actual) / 4.0;
-            println!("Current Readings Measurement: {actual}, : {target}");
+            // println!("Arm: {}, changed to: {}", measurement, actual);
             // Sleep 100ms
 
-            if float_eq!(actual, target, abs<= 0.00_1){
+            if float_eq!(actual, target, abs<= 0.0_1){
                 break;
             }
             thread::sleep(Duration::from_millis(elapse_mil));
         }
+        
     }
-    fn recieve_transmission(sensing_info: Self::SharedLock,sensor_recv: Receiver<ReadingType>, counts: i32) {
-        let singals_vector=Arc::new(Vec::new());
-        let mut recv_counts: i32=0;
+    fn recieve_transmission(sensing_info: Self::SharedLock,sensor_recv: Receiver<ReadingType>, counts: i32, feedbakc_send: Sender<ReadingType>) {
+        let recv_counts=Arc::new(AtomicI32::new(0));
         loop{
-            if recv_counts ==counts{
+            if recv_counts.load(Ordering::Acquire)==counts{
                 println!("all data have been recieved");
                 break;
             }
-            let vector=Arc::clone(&singals_vector);
             let receiver_lock=Arc::clone(&sensing_info);
+            let ref_value=Arc::clone(&recv_counts);
             match sensor_recv.recv(){
                 Ok(value) => {
                     println!("Readings recieved...");
-                    //no need to reference the value is the the enum implements copy
                     thread::spawn(move || {
                         let lock=receiver_lock.lock().unwrap();
                         let ReadingType::RoboticArm(arm, object)=value;
-                        Self::process_singals(lock, vector.to_vec(),&value, arm, object);
+                        println!("object {:?}: {:?}", ref_value, object);
+                        Self::process_singals(lock, &value, arm, object,ref_value);
                     });
-                    
-                    recv_counts+=1;
+                   // one issue detected is that the counts should increment only when the boxes are lifted not when they recieved, or the logic of the loop should change 
                 },
                 Err(RecvError)=> {
                     println!("Error in channel receiption: channel is empty");
@@ -75,26 +75,28 @@ impl Actuator for Pid{
         //     println!("{:?}", recv);
         //     recv_counts+=1;
         // }
-        println!("Sent: {counts}, recieved: {recv_counts}");
+        println!("Sent: {counts}, recieved: {:?}", recv_counts);
     }
 
-    fn process_singals<T>(lock: MutexGuard<T>,_signals_vector: Vec<ReadingType>,data: &ReadingType, mut current_arm_status: Actual, mut object_status: Target){
-        // *signals_vector.push(*data); //storing the value into a vector for storage purposes and for
-                                    //future use
-        println!("Actuator is processing the target :{:?}",data);
+    fn process_singals<T>(lock: MutexGuard<T>,_data: &ReadingType, mut current_arm_status: Actual, mut object_status: Target, recv_counts: Arc<AtomicI32>){
 //TODO: processing Position
-        println!("calculate_pid");
-        drop(lock);
-        Pid::calculate_pid(&mut current_arm_status.position,&mut object_status.position,1);
+        println!("altering position");
+        Pid::calculate_pid(&mut current_arm_status.position,&mut object_status.position,1, "Position");
+        thread::sleep(Duration::from_millis(10));
 //TODO: processing Temparture
-//         println!("calculate_pid");
-//         Pid::calculate_pid(&mut arm.temperature,&mut object.temperature, 1);
+        println!("altering temprature");
+        Pid::calculate_pid(&mut current_arm_status.temperature,&mut object_status.temperature, 1, "Temprature");
+        thread::sleep(Duration::from_millis(10));
 // //TODO: processing Force
-//         println!("calculate_pid");
-//         Pid::calculate_pid(&mut arm.force,&mut object.force, 1);
-// //TODO: processing Velocity
-//         println!("calculate_pid");
-//         Pid::calculate_pid(&mut arm.velocity,&mut object.velocity, 1);
+        println!("altering force");
+        Pid::calculate_pid(&mut current_arm_status.force,&mut object_status.force, 1, "Force");
+        thread::sleep(Duration::from_millis(10));
+//TODO: processing Velocity
+        println!("altering velocity");
+        Pid::calculate_pid(&mut current_arm_status.velocity,&mut object_status.velocity, 1, "Velocity");
+        drop(lock);
+        thread::sleep(Duration::from_millis(10));
+        recv_counts.fetch_add(1, Ordering::Release);
     }
     // fn adjust(){
 
