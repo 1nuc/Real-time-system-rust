@@ -24,7 +24,7 @@ impl Control for TransmissionChannel{
         let sensing_info= Arc::new(Mutex::new((robotic_data.current_state, robotic_data.objects.clone())));
         println!("objects :{}", robotic_data.objects_num);
         let feedback_channel=Self::init();
-        robotic_data.transmit_data(Arc::clone(&sensing_info),self.txes.clone(), feedback_channel.rxes);
+        robotic_data.sensor_control(Arc::clone(&sensing_info),self.txes.clone(), feedback_channel.rxes);
         Pid::recieve_transmission(Arc::clone(&sensing_info),self.rxes, robotic_data.objects_num, feedback_channel.txes);
     }
 }
