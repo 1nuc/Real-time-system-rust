@@ -1,4 +1,4 @@
-use std::{sync::{mpsc::{Sender, Receiver}, Arc, Mutex}, thread::{self}, time::Duration, result::Result};
+use std::{sync::{mpsc::{Sender, Receiver}, Arc, Mutex, MutexGuard}, thread::{self}, time::Duration, result::Result};
 
 use crate::{Actions, Sensing, Shared};
 
@@ -52,7 +52,8 @@ pub struct Readings {
     pub objects_num: i32,
 }
 impl Shared for Readings{
-    type SharedLock= Arc<Mutex<(Actual,Vec<(Target,String)>)>>;
+    type SharedLock<'a>=MutexGuard<'a, (Actual,Vec<(Target,String)>)>;
+    type Type= Arc<Mutex<(Actual,Vec<(Target,String)>)>>;
 }
 impl Sensing for Readings{
     fn assign_data(sample_data: i32 ) ->  Self{
@@ -98,36 +99,43 @@ impl Sensing for Readings{
         }
     }
 
-    fn sensor_control(&self, sensing_info: Self::SharedLock,sensor_send: Sender<ReadingType>, feedback_recv: Receiver<ReadingType>) {
+    fn sensor_control(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>, feedback_recv: Receiver<ReadingType>) {
         self.collect_data(sensing_info ,sensor_send);
     }
 
-    fn collect_data(&self, sensing_info: Self::SharedLock, sensor_send: Sender<ReadingType>) {
+    // Collect data in the initial state
+    fn collect_data(&self, sensing_info: Self::Type, sensor_send: Sender<ReadingType>) {
         for _ in 0..=self.objects.len(){
             let tx_copy=sensor_send.clone();
             let packets=Arc::clone(&sensing_info);
             thread::spawn(move ||{
-                let mut data=packets.lock().expect("error while locking");
-                match data.1.pop(){
-                    Some(value) =>{
-                        Self::transmit_data(ReadingType::RoboticArm(data.0, value.0), tx_copy);
-                    },
-                    None =>{
-                        drop(tx_copy);
-                        drop(data);
-                        println!("No more Targets..Sensor is closing");
-                    },
-                }
+                Self::sensor_workflow(packets, tx_copy);
             });
         }
         drop(sensor_send);
-        println!("All data has been sent");
     }
-    fn transmit_data(data: ReadingType, sensor_send: Sender<ReadingType>){
+    
+    //start threads to send the data through packets
+    fn sensor_workflow(packets: Self::Type, tx_copy: Sender<ReadingType>){
+        let mut data=packets.lock().expect("error while locking");
+        match data.1.pop(){
+            Some(value) =>{
+                Self::transmit_data(ReadingType::RoboticArm(data.0, value.0), tx_copy, data);
+            },
+            None =>{
+                drop(tx_copy);
+                drop(data);
+                println!("No more Targets..Sensor is closing");
+            },
+        }
+    }
+
+    //send the data through locks
+    fn transmit_data<'a>(data: ReadingType, sensor_send: Sender<ReadingType>, lock: Self::SharedLock<'a>){
        match sensor_send.send(data){
           Ok(_)=>{
             println!("Sending Target details...");
-            drop(data);
+            drop(lock);
             thread::sleep(Duration::from_millis(100));
           }, 
           Err(_) =>{
@@ -138,6 +146,8 @@ impl Sensing for Readings{
           }
        } 
     }
+
+    // The Aim of this infrustrcture is to easliy track the errors in the code 
 }
 
 

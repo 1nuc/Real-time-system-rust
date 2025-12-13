@@ -19,7 +19,8 @@ impl Actions for PidGain{
 
 impl Shared for Pid{
     // defining the type of the lock for the implementation of this struct
-    type SharedLock= Arc<Mutex<(Actual,Vec<(Target,String)>)>>;
+    type Type= Arc<Mutex<(Actual,Vec<(Target,String)>)>>;
+    type SharedLock<'a>=MutexGuard<'a, (Actual,Vec<(Target,String)>)>;
 }
 impl<'a> Actuator<'a> for Pid{
     fn calculate_pid(actual: &mut f32, target: &mut f32, elapse_mil: u64, measurement: &'a str) {   
@@ -41,7 +42,7 @@ impl<'a> Actuator<'a> for Pid{
         }
         
     }
-    fn recieve_transmission(sensing_info: Self::SharedLock,sensor_recv: Receiver<ReadingType>, counts: i32, feedbakc_send: Sender<ReadingType>) {
+    fn recieve_transmission(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>, counts: i32, feedbakc_send: Sender<ReadingType>) {
         let recv_counts=Arc::new(AtomicI32::new(0));
         loop{
             if recv_counts.load(Ordering::Acquire)==counts{

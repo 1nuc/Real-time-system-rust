@@ -8,11 +8,12 @@ pub trait Actions{
     fn new() -> Self;
 }
 pub trait Shared{
-    type SharedLock;
+    type SharedLock<'a>;
+    type Type;
 }
 pub trait Actuator <'a>: Shared{
     fn calculate_pid(actual: &mut f32, target: &mut f32, elapsed_mil: u64, measurment: &'a str);
-    fn recieve_transmission(sensing_info: Self::SharedLock,sensor_recv: Receiver<ReadingType>, counts: i32, feedback_send: Sender<ReadingType>);
+    fn recieve_transmission(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>, counts: i32, feedback_send: Sender<ReadingType>);
     fn process_singals<T>(lock: MutexGuard<T>,data: &ReadingType, current_arm_status: Actual, object_status: Target, recv_counts: Arc<AtomicI32>);
 
     // fn adjust();            
@@ -25,9 +26,10 @@ pub trait Sensing: Shared{
     fn generate_keys(index: i32)-> String;
     fn filter_noise(&self)-> Self;
     fn explore(&self);
-    fn collect_data(&self, sensing_info: Self::SharedLock,sensor_send: Sender<ReadingType>);
-    fn transmit_data(sensing_info: ReadingType, sensor_send: Sender<ReadingType>);
-    fn sensor_control(&self, sensing_info: Self::SharedLock,sensor_send: Sender<ReadingType>, feedback_recv: Receiver<ReadingType>);
+    fn collect_data(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>);
+    fn transmit_data<'a>(sensing_info: ReadingType, sensor_send: Sender<ReadingType>, lock: Self::SharedLock<'a>);
+    fn sensor_control(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>, feedback_recv: Receiver<ReadingType>);
+    fn sensor_workflow(packets: Self::Type, tx_copy: Sender<ReadingType>);
 }
 pub trait Control{
     fn init() -> Self;
