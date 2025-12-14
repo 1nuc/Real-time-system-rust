@@ -1,5 +1,6 @@
-use std::sync::{mpsc::{channel, Receiver, Sender}, Arc, Mutex};
-use crate::{Actuator, Control, Sensing, sensor::{ReadingType, Readings, Target}};
+use std::sync::{Arc, Mutex};
+use crate::{Actuator, Control, Sensing, sensor::{ReadingType, Readings}};
+use crossbeam::channel::*;
 use advanced_pid::{Pid};
 
 pub struct TransmissionChannel{
@@ -8,16 +9,12 @@ pub struct TransmissionChannel{
 }
 impl Control for TransmissionChannel{
     fn init()-> Self{
-        let (tx, rx) = channel::<ReadingType>();
+        let (tx, rx) = unbounded::<ReadingType>();
         Self{
             txes: tx,
             rxes: rx,
         }
     } 
-
-    fn clone(&self) -> Sender<ReadingType>{
-        self.txes.clone()
-    }
 
     fn simulation_control(self){
         let robotic_data=Readings::assign_data(30).filter_noise();
@@ -25,7 +22,7 @@ impl Control for TransmissionChannel{
         println!("objects :{}", robotic_data.objects_num);
         let feedback_channel=Self::init();
         robotic_data.sensor_control(Arc::clone(&sensing_info),self.txes.clone(), feedback_channel.rxes);
-        Pid::recieve_transmission(Arc::clone(&sensing_info),self.rxes, robotic_data.objects_num, feedback_channel.txes);
+        Pid::actuator_control(Arc::clone(&sensing_info),self.rxes, robotic_data.objects_num, feedback_channel.txes);
     }
 }
 

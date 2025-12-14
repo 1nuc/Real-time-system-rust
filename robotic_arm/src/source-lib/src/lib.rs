@@ -1,5 +1,5 @@
-use std::sync::{mpsc::{Receiver, Sender},MutexGuard,Arc, atomic::{AtomicI32}};
-
+use std::sync::{MutexGuard,Arc, atomic::{AtomicI32}};
+use crossbeam::channel::*;
 use crate::sensor::{ReadingType, Target, Actual};
 pub mod sensor;
 pub mod actuator;
@@ -13,12 +13,9 @@ pub trait Shared{
 }
 pub trait Actuator <'a>: Shared{
     fn calculate_pid(actual: &mut f32, target: &mut f32, elapsed_mil: u64, measurment: &'a str);
-    fn recieve_transmission(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>, counts: i32, feedback_send: Sender<ReadingType>);
+    fn recieve_transmission(sensing_lock: Self::Type,sensor_recv: Receiver<ReadingType>, recv_counts:Arc<AtomicI32>, feedback_send: Sender<ReadingType>);
+    fn actuator_control(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>, counts: i32, feedback_send: Sender<ReadingType>);
     fn process_singals<T>(lock: MutexGuard<T>,data: &ReadingType, current_arm_status: Actual, object_status: Target, recv_counts: Arc<AtomicI32>);
-
-    // fn adjust();            
-    // fn avoid_obstacles();
-    // fn filter_noise();
 }
 pub trait Sensing: Shared{
     const TOKEN: &'static str="This.@BoxIs!!V#ALid";
@@ -33,6 +30,5 @@ pub trait Sensing: Shared{
 }
 pub trait Control{
     fn init() -> Self;
-    fn clone(&self) -> Sender<ReadingType>;
     fn simulation_control(self);
 } 

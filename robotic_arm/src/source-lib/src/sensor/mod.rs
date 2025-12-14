@@ -1,4 +1,7 @@
-use std::{sync::{mpsc::{Sender, Receiver}, Arc, Mutex, MutexGuard}, thread::{self}, time::Duration, result::Result};
+use std::{
+    sync::{Arc, Mutex, MutexGuard},
+    thread, time::Duration};
+use crossbeam::channel::*;
 
 use crate::{Actions, Sensing, Shared};
 

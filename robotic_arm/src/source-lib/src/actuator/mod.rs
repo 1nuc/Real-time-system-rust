@@ -1,10 +1,11 @@
 use crate::sensor::{Actual, ReadingType, Target};
 use crate::{Actions, Actuator, Shared};
 use float_eq::float_eq;
-use std::sync::mpsc::{RecvError, TryRecvError};
-use std::sync::{Arc, Mutex, MutexGuard, atomic::{AtomicI32, Ordering}};
-use std::{sync::mpsc::{Receiver, Sender}, thread};
-use std::time::Duration;
+use crossbeam::channel::*;
+use std::{
+    thread, time::Duration, sync::{
+        Arc, Mutex, MutexGuard, atomic::{
+            AtomicI32, Ordering}}};
 use advanced_pid::{prelude::*, PidGain, Pid};
 
 impl Actions for PidGain{
@@ -42,41 +43,45 @@ impl<'a> Actuator<'a> for Pid{
         }
         
     }
-    fn recieve_transmission(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>, counts: i32, feedbakc_send: Sender<ReadingType>) {
+    fn actuator_control(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>, counts: i32, feedback_send: Sender<ReadingType>) {
         let recv_counts=Arc::new(AtomicI32::new(0));
         loop{
             if recv_counts.load(Ordering::Acquire)==counts{
                 println!("all data have been recieved");
                 break;
             }
-            let receiver_lock=Arc::clone(&sensing_info);
-            let ref_value=Arc::clone(&recv_counts);
+            else if sensor_recv.is_empty(){
+                println!("Channel is empty no messaging recieved");
+                thread::sleep(Duration::from_millis(200));
+            }
+            else {
+                for _ in 0..counts{
+                    let receiver_lock=Arc::clone(&sensing_info);
+                    // let recv_counts_cloned=Arc::clone(&recv_counts);
+                    let sensor_recv_cloned=sensor_recv.clone();
+                    Self::recieve_transmission(receiver_lock, sensor_recv_cloned,recv_counts.clone(), feedback_send.clone());
+                }
+                println!("Sent: {counts}, recieved: {:?}", recv_counts);
+            }
+        }
+    }
+    fn recieve_transmission(sensing_lock: Self::Type,sensor_recv: Receiver<ReadingType>,ref_value:Arc<AtomicI32>,feedbakc_send: Sender<ReadingType>) {
+        thread::spawn(move || {
             match sensor_recv.recv(){
                 Ok(value) => {
                     println!("Readings recieved...");
-                    thread::spawn(move || {
-                        let lock=receiver_lock.lock().unwrap();
-                        let ReadingType::RoboticArm(arm, object)=value;
-                        println!("object {:?}: {:?}", ref_value, object);
-                        Self::process_singals(lock, &value, arm, object,ref_value);
-                    });
+                    let lock=sensing_lock.lock().unwrap();
+                    let ReadingType::RoboticArm(arm, object)=value;
+                    println!("object {:?}: {:?}", ref_value, object);
+                    Self::process_singals(lock, &value, arm, object,ref_value);
                    // one issue detected is that the counts should increment only when the boxes are lifted not when they recieved, or the logic of the loop should change 
                 },
                 Err(RecvError)=> {
                     println!("Error in channel receiption: channel is empty");
                     //TODO: Some logic should be made to avoid channel collapse
                 },
-                // Err(TryRecvError::Disconnected) => println!("Channel disconnected"),
-                // Err(TryRecvError::Disconnected) => println!("channel reciever is disconnected"),
             }
-        }
-        // I prefer to use this method as there is an error introduced
-        // for recv in sensor_recv.try_iter(){
-        //     println!("Readings recieved...");
-        //     println!("{:?}", recv);
-        //     recv_counts+=1;
-        // }
-        println!("Sent: {counts}, recieved: {:?}", recv_counts);
+        });
     }
 
     fn process_singals<T>(lock: MutexGuard<T>,_data: &ReadingType, mut current_arm_status: Actual, mut object_status: Target, recv_counts: Arc<AtomicI32>){
@@ -95,9 +100,9 @@ impl<'a> Actuator<'a> for Pid{
 //TODO: processing Velocity
         println!("altering velocity");
         Pid::calculate_pid(&mut current_arm_status.velocity,&mut object_status.velocity, 1, "Velocity");
-        drop(lock);
         thread::sleep(Duration::from_millis(10));
         recv_counts.fetch_add(1, Ordering::Release);
+        drop(lock);
     }
     // fn adjust(){
 
