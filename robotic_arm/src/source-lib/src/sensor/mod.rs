@@ -1,13 +1,13 @@
 use std::{
     sync::{Arc, Mutex, MutexGuard},
-    thread, time::Duration};
+    thread, time::{Duration, Instant}};
 use crossbeam::channel::*;
 
 use crate::{Actions, Sensing, Shared};
 
 #[derive(Clone, Copy, Debug)]
 pub enum ReadingType{
-    RoboticArm(Actual, Target),
+    RoboticArm(Actual, Target, i32),
 } 
 #[derive(Clone, Copy, Debug)]
 pub struct Actual{ 
@@ -50,21 +50,21 @@ impl Actions for Target{
 } 
 #[derive(Debug, Clone)]
 pub struct Readings {
-    pub objects: Vec<(Target,String)>,
-    pub current_state: Actual,
+    pub objects: Vec<(Target,String,i32)>, //each object contains the required info to be lifted 
+    pub current_state: Actual, //as well as the token and ID
     pub objects_num: i32,
 }
 impl Shared for Readings{
-    type SharedLock<'a>=MutexGuard<'a, (Actual,Vec<(Target,String)>)>;
-    type Type= Arc<Mutex<(Actual,Vec<(Target,String)>)>>;
+    type SharedLock<'a>=MutexGuard<'a, (Actual,Vec<(Target,String, i32)>)>;
+    type Type= Arc<Mutex<(Actual,Vec<(Target,String, i32)>)>>;
 }
 impl Sensing for Readings{
     fn assign_data(sample_data: i32 ) ->  Self{
         let mut arr= Vec::new();
         let mut count:i32=0;
-        for _ in 0..sample_data{
+        for i in 0..sample_data{
             let index: i32= rand::random_range(0..=1);
-            arr.push((Target::new(), Self::generate_keys(index)));
+            arr.push((Target::new(), Self::generate_keys(index), i));
             count+=1;
         }
         Self{
@@ -91,7 +91,7 @@ impl Sensing for Readings{
     }
 
     fn filter_noise(&self)-> Self {
-        let filtered_objects: Vec<(Target, String)>=self.objects.clone().into_iter().filter(|x|{
+        let filtered_objects: Vec<(Target, String, i32)>=self.objects.clone().into_iter().filter(|x|{
             x.1==Self::TOKEN
         }).collect();
         let up_count: i32=filtered_objects.len().try_into().unwrap();
@@ -102,8 +102,33 @@ impl Sensing for Readings{
         }
     }
 
+    fn update_indices(&mut self, id: i32, new_current_state: Actual)->Self {
+        let updated_data=self.objects.clone().into_iter().filter(|x| x.2 !=id).collect();
+        self.objects_num-=1;
+        Self{
+            objects: updated_data,
+            current_state:new_current_state,
+            objects_num: self.objects_num,
+        }
+    }
+
     fn sensor_control(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>, feedback_recv: Receiver<ReadingType>) {
-        self.collect_data(sensing_info ,sensor_send);
+        if feedback_recv.is_empty(){
+            self.collect_data(sensing_info ,sensor_send);
+        }
+        else{
+            let now=Instant::now();
+            let mut objects=Vec::new();
+            let mut arm_status: Actual=self.current_state;
+            let token=Self::TOKEN.to_string();
+            for data in feedback_recv.recv_deadline(now + Duration::from_millis(400)){
+                let ReadingType::RoboticArm(arm, remaining_objects, id)=data;
+                arm_status=arm;
+                objects.push((remaining_objects,token.clone(), id));
+            } 
+            let objects_lock=Arc::new(Mutex::new((arm_status, objects)));
+            self.collect_data(objects_lock, sensor_send);
+        }
     }
 
     // Collect data in the initial state
@@ -123,7 +148,7 @@ impl Sensing for Readings{
         let mut data=packets.lock().expect("error while locking");
         match data.1.pop(){
             Some(value) =>{
-                Self::transmit_data(ReadingType::RoboticArm(data.0, value.0), tx_copy, data);
+                Self::transmit_data(ReadingType::RoboticArm(data.0, value.0, value.2), tx_copy, data);
             },
             None =>{
                 drop(tx_copy);
@@ -149,7 +174,6 @@ impl Sensing for Readings{
           }
        } 
     }
-
     // The Aim of this infrustrcture is to easliy track the errors in the code 
 }
 

@@ -23,6 +23,7 @@ pub trait Sensing: Shared{
     fn generate_keys(index: i32)-> String;
     fn filter_noise(&self)-> Self;
     fn explore(&self);
+    fn update_indices(&mut self, id: i32, new_current_state: Actual)->Self;
     fn collect_data(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>);
     fn transmit_data<'a>(sensing_info: ReadingType, sensor_send: Sender<ReadingType>, lock: Self::SharedLock<'a>);
     fn sensor_control(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>, feedback_recv: Receiver<ReadingType>);

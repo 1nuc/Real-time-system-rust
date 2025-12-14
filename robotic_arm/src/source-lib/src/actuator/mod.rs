@@ -20,8 +20,8 @@ impl Actions for PidGain{
 
 impl Shared for Pid{
     // defining the type of the lock for the implementation of this struct
-    type Type= Arc<Mutex<(Actual,Vec<(Target,String)>)>>;
-    type SharedLock<'a>=MutexGuard<'a, (Actual,Vec<(Target,String)>)>;
+    type Type= Arc<Mutex<(Actual,Vec<(Target,String, i32)>)>>;
+    type SharedLock<'a>=MutexGuard<'a, (Actual,Vec<(Target,String, i32)>)>;
 }
 impl<'a> Actuator<'a> for Pid{
     fn calculate_pid(actual: &mut f32, target: &mut f32, elapse_mil: u64, measurement: &'a str) {   
@@ -71,7 +71,7 @@ impl<'a> Actuator<'a> for Pid{
                 Ok(value) => {
                     println!("Readings recieved...");
                     let lock=sensing_lock.lock().unwrap();
-                    let ReadingType::RoboticArm(arm, object)=value;
+                    let ReadingType::RoboticArm(arm, object, id)=value;
                     println!("object {:?}: {:?}", ref_value, object);
                     Self::process_singals(lock, &value, arm, object,ref_value);
                    // one issue detected is that the counts should increment only when the boxes are lifted not when they recieved, or the logic of the loop should change 
