@@ -6,18 +6,18 @@ use crate::{Actuator,Shared,Target, Actual, Control, Sensing, sensor::{ReadingTy
 use crossbeam::channel::*;
 use advanced_pid::{Pid};
 
-pub struct TransmissionChannel<T>{
-    pub txes: Sender<T>,
-    pub rxes: Receiver<T>,
+pub struct TransmissionChannel{
+    pub txes: Sender<ReadingType>,
+    pub rxes: Receiver<ReadingType>,
 }
 
-impl <T>Shared for TransmissionChannel<T>{
+impl Shared for TransmissionChannel{
     type SharedLock<'a>=MutexGuard<'a, (Actual,Vec<(Target,String, i32)>)>;
     type Type= Arc<Mutex<(Actual,Vec<(Target,String, i32)>)>>;
 }
 
-impl Control for TransmissionChannel<T>{
-    fn init(&self)-> Self{
+impl Control for TransmissionChannel{
+    fn init()-> Self{
         let (tx, rx) = unbounded::<ReadingType>();
         Self{
             txes: tx,

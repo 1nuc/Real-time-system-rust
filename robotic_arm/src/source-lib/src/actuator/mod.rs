@@ -59,13 +59,14 @@ impl<'a> Actuator<'a> for Pid{
                     let receiver_lock=Arc::clone(&sensing_info);
                     // let recv_counts_cloned=Arc::clone(&recv_counts);
                     let sensor_recv_cloned=sensor_recv.clone();
+                    let recv_counts_cloned=Arc::clone(&recv_counts);
                     thread::spawn(move || {
-                        let lock=receiver_lock.lock().unwrap();
                         match TransmissionChannel::recieve_transmission(sensor_recv_cloned){
                             Some(val)=>{
+                                let lock=receiver_lock.lock().unwrap();
                                 let ReadingType::RoboticArm(arm, object, id)=val;
-                                println!("object {:?}: {:?}", recv_counts, object);
-                                Self::process_singals(lock, arm, object,recv_counts);
+                                println!("object {:?}: {:?}", recv_counts_cloned, object);
+                                Self::process_singals(lock, arm, object,recv_counts_cloned);
                             },
                             None => (),
                         } 
