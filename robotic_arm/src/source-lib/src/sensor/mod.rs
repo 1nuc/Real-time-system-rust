@@ -3,7 +3,7 @@ use std::{
     thread, time::{Duration, Instant}};
 use crossbeam::channel::*;
 
-use crate::{Actions, Sensing, Shared};
+use crate::{Actions, Sensing, Shared,Control, transmission_control::TransmissionChannel};
 
 #[derive(Clone, Copy, Debug)]
 pub enum ReadingType{
@@ -148,7 +148,7 @@ impl Sensing for Readings{
         let mut data=packets.lock().expect("error while locking");
         match data.1.pop(){
             Some(value) =>{
-                Self::transmit_data(ReadingType::RoboticArm(data.0, value.0, value.2), tx_copy, data);
+                TransmissionChannel::transmit_data(ReadingType::RoboticArm(data.0, value.0, value.2), tx_copy, data);
             },
             None =>{
                 drop(tx_copy);
@@ -159,21 +159,6 @@ impl Sensing for Readings{
     }
 
     //send the data through locks
-    fn transmit_data<'a>(data: ReadingType, sensor_send: Sender<ReadingType>, lock: Self::SharedLock<'a>){
-       match sensor_send.send(data){
-          Ok(_)=>{
-            println!("Sending Target details...");
-            drop(lock);
-            thread::sleep(Duration::from_millis(100));
-          }, 
-          Err(_) =>{
-              "error while sending, thread run into fail safe mode...";
-              //TODO: Implementing fault tolerance mechanism Options:
-              //1. Checkpoints
-              //2. more concrete fail safe mode function 
-          }
-       } 
-    }
     // The Aim of this infrustrcture is to easliy track the errors in the code 
 }
 

@@ -1,5 +1,5 @@
-use crate::sensor::{Actual, ReadingType, Target};
-use crate::{Actions, Actuator, Shared};
+use crate::{sensor::{Actual, ReadingType, Target}, transmission_control::TransmissionChannel};
+use crate::{Actions, Actuator, Shared, Control};
 use float_eq::float_eq;
 use crossbeam::channel::*;
 use std::{
@@ -59,32 +59,24 @@ impl<'a> Actuator<'a> for Pid{
                     let receiver_lock=Arc::clone(&sensing_info);
                     // let recv_counts_cloned=Arc::clone(&recv_counts);
                     let sensor_recv_cloned=sensor_recv.clone();
-                    Self::recieve_transmission(receiver_lock, sensor_recv_cloned,recv_counts.clone(), feedback_send.clone());
+                    thread::spawn(move || {
+                        let lock=receiver_lock.lock().unwrap();
+                        match TransmissionChannel::recieve_transmission(sensor_recv_cloned){
+                            Some(val)=>{
+                                let ReadingType::RoboticArm(arm, object, id)=val;
+                                println!("object {:?}: {:?}", recv_counts, object);
+                                Self::process_singals(lock, arm, object,recv_counts);
+                            },
+                            None => (),
+                        } 
+                    });
                 }
                 println!("Sent: {counts}, recieved: {:?}", recv_counts);
             }
         }
     }
-    fn recieve_transmission(sensing_lock: Self::Type,sensor_recv: Receiver<ReadingType>,ref_value:Arc<AtomicI32>,feedbakc_send: Sender<ReadingType>) {
-        thread::spawn(move || {
-            match sensor_recv.recv(){
-                Ok(value) => {
-                    println!("Readings recieved...");
-                    let lock=sensing_lock.lock().unwrap();
-                    let ReadingType::RoboticArm(arm, object, id)=value;
-                    println!("object {:?}: {:?}", ref_value, object);
-                    Self::process_singals(lock, &value, arm, object,ref_value);
-                   // one issue detected is that the counts should increment only when the boxes are lifted not when they recieved, or the logic of the loop should change 
-                },
-                Err(RecvError)=> {
-                    println!("Error in channel receiption: channel is empty");
-                    //TODO: Some logic should be made to avoid channel collapse
-                },
-            }
-        });
-    }
 
-    fn process_singals<T>(lock: MutexGuard<T>,_data: &ReadingType, mut current_arm_status: Actual, mut object_status: Target, recv_counts: Arc<AtomicI32>){
+    fn process_singals(lock: Self::SharedLock<'a>, mut current_arm_status: Actual, mut object_status: Target, recv_counts: Arc<AtomicI32>){
 //TODO: processing Position
         println!("altering position");
         Pid::calculate_pid(&mut current_arm_status.position,&mut object_status.position,1, "Position");

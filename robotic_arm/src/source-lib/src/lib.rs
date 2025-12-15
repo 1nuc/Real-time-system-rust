@@ -13,9 +13,8 @@ pub trait Shared{
 }
 pub trait Actuator <'a>: Shared{
     fn calculate_pid(actual: &mut f32, target: &mut f32, elapsed_mil: u64, measurment: &'a str);
-    fn recieve_transmission(sensing_lock: Self::Type,sensor_recv: Receiver<ReadingType>, recv_counts:Arc<AtomicI32>, feedback_send: Sender<ReadingType>);
     fn actuator_control(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>, counts: i32, feedback_send: Sender<ReadingType>);
-    fn process_singals<T>(lock: MutexGuard<T>,data: &ReadingType, current_arm_status: Actual, object_status: Target, recv_counts: Arc<AtomicI32>);
+    fn process_singals(lock: Self::SharedLock<'a>, current_arm_status: Actual, object_status: Target, recv_counts: Arc<AtomicI32>);
 }
 pub trait Sensing: Shared{
     const TOKEN: &'static str="This.@BoxIs!!V#ALid";
@@ -25,11 +24,12 @@ pub trait Sensing: Shared{
     fn explore(&self);
     fn update_indices(&mut self, id: i32, new_current_state: Actual)->Self;
     fn collect_data(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>);
-    fn transmit_data<'a>(sensing_info: ReadingType, sensor_send: Sender<ReadingType>, lock: Self::SharedLock<'a>);
     fn sensor_control(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>, feedback_recv: Receiver<ReadingType>);
     fn sensor_workflow(packets: Self::Type, tx_copy: Sender<ReadingType>);
 }
-pub trait Control{
-    fn init() -> Self;
+pub trait Control: Shared{
+    fn init()-> Self;
     fn simulation_control(self);
+    fn transmit_data<'a>(data: ReadingType, sensor_send: Sender<ReadingType>, lock: Self::SharedLock<'a>);
+    fn recieve_transmission(sensor_recv: Receiver<ReadingType>)->Option<ReadingType>;
 } 
