@@ -55,13 +55,13 @@ impl Control for TransmissionChannel{
                 },
             }
     }
-    fn recieve_transmission_deadline(now: Instant,object_lock:Arc<Mutex<Vec<(Target, String, i32)>>>, arm_status: Arc<Actual>,feedback_recv: Receiver<ReadingType>){
+    fn recieve_transmission_deadline(now: Instant,object_lock:Arc<Mutex<Vec<(Target, String, i32)>>>, mut arm_status: Arc<Actual>,feedback_recv: Receiver<ReadingType>){
         let token=<Readings as Sensing>::TOKEN.to_string();
         match feedback_recv.recv_deadline(now + Duration::from_millis(500)){
             Ok(value) =>{
                 let mut data=object_lock.lock().expect("cannot lock");
                 let ReadingType::RoboticArm(arm, remaining_objects, id)=value;
-                arm_status=arm.into();
+                *Arc::make_mut(&mut arm_status)=arm.into();
                 data.push((remaining_objects,token, id));
                 drop(data);
             },
