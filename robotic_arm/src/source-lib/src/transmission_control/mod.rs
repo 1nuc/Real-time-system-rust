@@ -1,6 +1,5 @@
-use std::{time::Duration,sync::{
+use std::{time::{Duration, Instant},sync::{
     Arc, Mutex,MutexGuard}, thread,
-    convert::{From, Into}
 };
 use crate::{Actuator,Shared,Target, Actual, Control, Sensing, sensor::{ReadingType, Readings}};
 use crossbeam::channel::*;
@@ -55,6 +54,20 @@ impl Control for TransmissionChannel{
                     //TODO: Some logic should be made to avoid channel collapse
                 },
             }
+    }
+    fn recieve_transmission_deadline(now: Instant,feedback_recv: Receiver<ReadingType>)->Option<ReadingType> {
+        
+        let token=Sensing::TOKEN.to_string();
+        match feedback_recv.recv_deadline(now + Duration::from_millis(500)){
+            Ok(value) =>{
+                let mut data=object_copy.lock().expect("cannot lock");
+                let ReadingType::RoboticArm(arm, remaining_objects, id)=value;
+                arm_status=arm;
+                data.push((remaining_objects,token, id));
+                drop(data);
+            },
+            Err(RecvTimeoutError)=> println!("Time out"),
+        }
     }
 
     fn simulation_control(self){
