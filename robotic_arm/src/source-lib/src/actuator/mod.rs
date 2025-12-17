@@ -24,7 +24,7 @@ impl Shared for Pid{
     type SharedLock<'a>=MutexGuard<'a, (Actual,Vec<(Target,String, i32)>)>;
 }
 impl<'a> Actuator<'a> for Pid{
-    fn calculate_pid(actual: &mut f32, target: &mut f32, elapse_mil: u64, measurement: &'a str) {   
+    fn calculate_pid(actual: &mut f32, target: &mut f32, elapse_mil: u64, measurement: &'a str) ->f32 {   
         let gain = PidGain::new(); 
         let mut pid = Pid::new(gain.into());
         let dt = 0.1;
@@ -39,8 +39,11 @@ impl<'a> Actuator<'a> for Pid{
             if float_eq!(actual, target, abs<= 0.0_1){
                 break;
             }
+            //TODO: this should return the updated actual robotic status
             thread::sleep(Duration::from_millis(elapse_mil));
         }
+        println!("Arm: {}, changed to: {}", measurement, actual);
+        *actual
         
     }
     fn actuator_control(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>, counts: i32, feedback_send: Sender<ReadingType>) {
@@ -96,6 +99,9 @@ impl<'a> Actuator<'a> for Pid{
         thread::sleep(Duration::from_millis(10));
         recv_counts.fetch_add(1, Ordering::Release);
         drop(lock);
+        //TODO: Adding a function to represent the act and delete the from the vector
+        //TODO: only give away the lock once the updated vector is transmitted 
+        //TODO: consider adding the sending function 
     }
     // fn adjust(){
 
