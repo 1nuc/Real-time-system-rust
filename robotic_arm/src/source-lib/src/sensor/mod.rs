@@ -3,7 +3,7 @@ use std::{
     thread, time::{Duration, Instant}};
 use crossbeam::{channel::*};
 
-use crate::{Actions, Sensing, Shared,Control, transmission_control::TransmissionChannel};
+use crate::{Actions, Control, Sensing, Shared, transmission_control::{self, TransmissionChannel}};
 
 #[derive(Clone, Copy, Debug)]
 pub enum ReadingType{
@@ -119,28 +119,20 @@ impl Sensing for Readings{
         else{
             let now=Instant::now();
             let mut objects=Arc::new(Mutex::new(Vec::new()));
-            let mut arm_status: Actual=self.current_state;
+            let mut arm_status=Arc::new(self.current_state);
             while feedback_recv.is_full(){
                 let object_copy=Arc::clone(&mut objects);
                 let feedback_recv_cloned=feedback_recv.clone();
+                let arm_status_cloned=Arc::clone(&mut arm_status);
                 thread::spawn(move||{
-                    let token=Self::TOKEN.to_string();
-                    match feedback_recv_cloned.recv_deadline(now + Duration::from_millis(500)){
-                        Ok(value) =>{
-                            let mut data=object_copy.lock().expect("cannot lock");
-                            let ReadingType::RoboticArm(arm, remaining_objects, id)=value;
-                            arm_status=arm;
-                            data.push((remaining_objects,token, id));
-                            drop(data);
-                        },
-                        Err(RecvTimeoutError)=> println!("Time out"),
-                    }
+                    TransmissionChannel::recieve_transmission_deadline(now, object_copy, arm_status_cloned, feedback_recv_cloned);
                 });
             }
             match Arc::try_unwrap(objects){
                 Ok(val)=>{
                     let object=val.into_inner().unwrap();
-                    let objects_lock=Arc::new(Mutex::new((arm_status, object)));
+                    let arm_unwrapped=Arc::try_unwrap(arm_status).unwrap();
+                    let objects_lock=Arc::new(Mutex::new((arm_unwrapped, object)));
                     self.collect_data(objects_lock, sensor_send);
                 },
                 Err(err)=>println!("values cannot be unwrapped: {:?}", err),
