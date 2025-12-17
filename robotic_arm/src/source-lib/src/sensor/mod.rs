@@ -18,13 +18,20 @@ pub struct Actual{
 }
 //define the implmnetation of the Action crate to the struct
 impl Actions for Actual{
-
-    fn new() -> Self{
+    fn new() -> Self where Self: Sized{
         Self {
             force: rand::random::<f32>(), 
             velocity: rand::random::<f32>(),
             position: rand::random::<f32>(),
             temperature: rand::random_range(0.0..=100.0),
+        }
+    }
+    fn init(temp: f32, force: f32, vel: f32, pos: f32)->Self where Self: Sized{
+        Self{
+            force: force,
+            velocity: vel,
+            position: pos,
+            temperature: temp,
         }
     }
 } 
@@ -38,13 +45,20 @@ pub struct Target{
 }
 //define implementation for the target
 impl Actions for Target{
-
-    fn new() -> Self{
-        Self{
+    fn new() -> Self where Self: Sized{
+        Self {
             force: rand::random::<f32>(), 
             velocity: rand::random::<f32>(),
             position: rand::random::<f32>(),
             temperature: rand::random_range(0.0..=100.0),
+        }
+    }
+    fn init(temp: f32, force: f32, vel: f32, pos: f32)->Self where Self: Sized{
+        Self{
+            force: force,
+            velocity: vel,
+            position: pos,
+            temperature: temp,
         }
     }
 } 

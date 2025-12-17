@@ -29,17 +29,13 @@ impl<'a> Actuator<'a> for Pid{
         let mut pid = Pid::new(gain.into());
         let dt = 0.1;
         loop {
-            // Calculate control output
             let output = pid.update(*target, *actual, dt);
 
             *actual += (output - *actual) / 4.0;
-            // println!("Arm: {}, changed to: {}", measurement, actual);
-            // Sleep 100ms
 
             if float_eq!(actual, target, abs<= 0.0_1){
                 break;
             }
-            //TODO: this should return the updated actual robotic status
             thread::sleep(Duration::from_millis(elapse_mil));
         }
         println!("Arm: {}, changed to: {}", measurement, actual);
@@ -62,6 +58,7 @@ impl<'a> Actuator<'a> for Pid{
                     let receiver_lock=Arc::clone(&sensing_info);
                     // let recv_counts_cloned=Arc::clone(&recv_counts);
                     let sensor_recv_cloned=sensor_recv.clone();
+                    let feedback_send_cloned=feedback_send.clone();
                     let recv_counts_cloned=Arc::clone(&recv_counts);
                     thread::spawn(move || {
                         match TransmissionChannel::recieve_transmission(sensor_recv_cloned){
@@ -69,7 +66,7 @@ impl<'a> Actuator<'a> for Pid{
                                 let lock=receiver_lock.lock().unwrap();
                                 let ReadingType::RoboticArm(arm, object, id)=val;
                                 println!("object {:?}: {:?}", recv_counts_cloned, object);
-                                Self::process_singals(lock, arm, object,recv_counts_cloned);
+                                Self::process_singals(lock, arm, object,recv_counts_cloned, id, feedback_send_cloned);
                             },
                             None => (),
                         } 
@@ -80,29 +77,40 @@ impl<'a> Actuator<'a> for Pid{
         }
     }
 
-    fn process_singals(lock: Self::SharedLock<'a>, mut current_arm_status: Actual, mut object_status: Target, recv_counts: Arc<AtomicI32>){
+    fn process_singals(lock: Self::SharedLock<'a>, mut current_arm_status: Actual, mut object_status: Target, recv_counts: Arc<AtomicI32>, id: i32, feedback_send: Sender<ReadingType>){
 //TODO: processing Position
-        println!("altering position");
-        Pid::calculate_pid(&mut current_arm_status.position,&mut object_status.position,1, "Position");
-        thread::sleep(Duration::from_millis(10));
+        let position=thread::spawn(move||{
+            println!("altering position");
+            Pid::calculate_pid(&mut current_arm_status.position,&mut object_status.position,1, "Position");
+            thread::sleep(Duration::from_millis(10));
+        });
 //TODO: processing Temparture
-        println!("altering temprature");
-        Pid::calculate_pid(&mut current_arm_status.temperature,&mut object_status.temperature, 1, "Temprature");
-        thread::sleep(Duration::from_millis(10));
+        let temparture=thread::spawn(move || {
+            println!("altering temprature");
+            Pid::calculate_pid(&mut current_arm_status.temperature,&mut object_status.temperature, 1, "Temprature");
+            thread::sleep(Duration::from_millis(10));
+        });
 // //TODO: processing Force
-        println!("altering force");
-        Pid::calculate_pid(&mut current_arm_status.force,&mut object_status.force, 1, "Force");
-        thread::sleep(Duration::from_millis(10));
+        let force=thread::spawn(move || {
+            println!("altering force");
+            Pid::calculate_pid(&mut current_arm_status.force,&mut object_status.force, 1, "Force");
+            thread::sleep(Duration::from_millis(10));
+        });
 //TODO: processing Velocity
-        println!("altering velocity");
-        Pid::calculate_pid(&mut current_arm_status.velocity,&mut object_status.velocity, 1, "Velocity");
-        thread::sleep(Duration::from_millis(10));
+        let velocity=thread::spawn(move ||{
+            println!("altering velocity");
+            Pid::calculate_pid(&mut current_arm_status.velocity,&mut object_status.velocity, 1, "Velocity");
+            thread::sleep(Duration::from_millis(10));
+        });
         recv_counts.fetch_add(1, Ordering::Release);
+
         drop(lock);
         //TODO: Adding a function to represent the act and delete the from the vector
         //TODO: only give away the lock once the updated vector is transmitted 
         //TODO: consider adding the sending function 
     }
-    // fn adjust(){
-
+    fn process_feedback() {
+        
+    }
 }
+
