@@ -134,7 +134,7 @@ impl Sensing for Readings{
             let now=Instant::now();
             let mut objects=Arc::new(Mutex::new(Vec::new()));
             let mut arm_status=Arc::new(self.current_state);
-            while feedback_recv.is_full(){
+            while !feedback_recv.is_empty(){
                 let object_copy=Arc::clone(&mut objects);
                 let feedback_recv_cloned=feedback_recv.clone();
                 let arm_status_cloned=Arc::clone(&mut arm_status);
@@ -144,12 +144,13 @@ impl Sensing for Readings{
             }
             match Arc::try_unwrap(objects){
                 Ok(val)=>{
+                    println!("Objects are safe");
                     let object=val.into_inner().unwrap();
                     let arm_unwrapped=Arc::try_unwrap(arm_status).unwrap();
                     let objects_lock=Arc::new(Mutex::new((arm_unwrapped, object)));
                     self.collect_data(objects_lock, sensor_send, counts);
                 },
-                Err(err)=>println!("values cannot be unwrapped: {:?}", err),
+                Err(err) =>println!("objects cannot be unwrapped:{:?}", err),
             }
         }
     }

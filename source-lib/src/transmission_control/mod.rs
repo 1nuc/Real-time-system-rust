@@ -29,7 +29,6 @@ impl Control for TransmissionChannel{
           Ok(_)=>{
             println!("Sending Target details...");
             drop(lock);
-            // thread::sleep(Duration::from_millis(100));
           }, 
           Err(_) =>{
               "error while sending, thread run into fail safe mode...";
@@ -46,7 +45,6 @@ impl Control for TransmissionChannel{
                 Ok(value) => {
                     println!("Readings recieved...");
                     Some(value)
-                   // one issue detected is that the counts should increment only when the boxes are lifted not when they recieved, or the logic of the loop should change 
                 },
                 Err(e)=> {
                    println!("Error in recieving the data: {e}");
@@ -57,8 +55,9 @@ impl Control for TransmissionChannel{
     }
     fn recieve_transmission_deadline(now: Instant,object_lock:Arc<Mutex<Vec<(Target, String, i32)>>>, mut arm_status: Arc<Actual>,feedback_recv: Receiver<ReadingType>){
         let token=<Readings as Sensing>::TOKEN.to_string();
-        match feedback_recv.recv_deadline(now + Duration::from_millis(50)){
+        match feedback_recv.recv_deadline(now + Duration::from_millis(500)){
             Ok(value) =>{
+                println!("its running");
                 let mut data=object_lock.lock().expect("cannot lock");
                 let ReadingType::RoboticArm(arm, remaining_objects, id)=value;
                 *Arc::make_mut(&mut arm_status)=arm.into();
