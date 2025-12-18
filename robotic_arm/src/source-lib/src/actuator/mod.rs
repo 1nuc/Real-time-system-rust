@@ -16,6 +16,9 @@ impl Actions for PidGain{
             kd: 0.1,
         }
     }
+    fn init(_temp: f32, _force: f32, _vel: f32, _pos: f32){
+        
+    }
 }
 
 impl Shared for Pid{
@@ -79,29 +82,40 @@ impl<'a> Actuator<'a> for Pid{
 
     fn process_singals(lock: Self::SharedLock<'a>, mut current_arm_status: Actual, mut object_status: Target, recv_counts: Arc<AtomicI32>, id: i32, feedback_send: Sender<ReadingType>){
 //TODO: processing Position
+        let mut thread_handler=Vec::new();
         let position=thread::spawn(move||{
             println!("altering position");
             Pid::calculate_pid(&mut current_arm_status.position,&mut object_status.position,1, "Position");
             thread::sleep(Duration::from_millis(10));
-        });
+        }).join().unwrap();
+        // thread_handler.push(position);
 //TODO: processing Temparture
         let temparture=thread::spawn(move || {
             println!("altering temprature");
             Pid::calculate_pid(&mut current_arm_status.temperature,&mut object_status.temperature, 1, "Temprature");
             thread::sleep(Duration::from_millis(10));
-        });
+        }).join().unwrap();
+        // thread_handler.push(temparture);
 // //TODO: processing Force
         let force=thread::spawn(move || {
             println!("altering force");
             Pid::calculate_pid(&mut current_arm_status.force,&mut object_status.force, 1, "Force");
             thread::sleep(Duration::from_millis(10));
-        });
+        }).join().unwrap();
+        // thread_handler.push(force);
 //TODO: processing Velocity
         let velocity=thread::spawn(move ||{
             println!("altering velocity");
             Pid::calculate_pid(&mut current_arm_status.velocity,&mut object_status.velocity, 1, "Velocity");
             thread::sleep(Duration::from_millis(10));
-        });
+        }).join().unwrap();
+        let val: i32=velocity;
+        // thread_handler.push(velocity);
+        // for handle in thread_handler{
+        //     handle.join().unwrap();
+        // }
+
+        Self::process_feedback(position, temparture, force, velocity); 
         recv_counts.fetch_add(1, Ordering::Release);
 
         drop(lock);
@@ -109,7 +123,7 @@ impl<'a> Actuator<'a> for Pid{
         //TODO: only give away the lock once the updated vector is transmitted 
         //TODO: consider adding the sending function 
     }
-    fn process_feedback() {
+    fn process_feedback(pos: f32, temparture: f32, force: f32, vel: f32) {
         
     }
 }

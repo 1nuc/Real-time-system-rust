@@ -16,7 +16,7 @@ pub trait Actuator <'a>: Shared{
     fn calculate_pid(actual: &mut f32, target: &mut f32, elapsed_mil: u64, measurment: &'a str) -> f32;
     fn actuator_control(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>, counts: i32, feedback_send: Sender<ReadingType>);
     fn process_singals(lock: Self::SharedLock<'a>, current_arm_status: Actual, object_status: Target, recv_counts: Arc<AtomicI32>, id: i32, feedback_send: Sender<ReadingType>);
-    fn process_feedback();
+    fn process_feedback(pos: f32, temparture: f32, force: f32, vel: f32);
 }
 pub trait Sensing: Shared{
     const TOKEN: &'static str="This.@BoxIs!!V#ALid";
