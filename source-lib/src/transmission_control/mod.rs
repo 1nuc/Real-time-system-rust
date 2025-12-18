@@ -53,18 +53,16 @@ impl Control for TransmissionChannel{
                 },
             }
     }
-    fn recieve_transmission_deadline(now: Instant,object_lock:Arc<Mutex<Vec<(Target, String, i32)>>>, mut arm_status: Arc<Actual>,feedback_recv: Receiver<ReadingType>){
+    fn recieve_transmission_deadline(now: Instant, mut data:MutexGuard<Vec<(Target, String, i32)>>, mut arm_status: Arc<Actual>,feedback_recv: Receiver<ReadingType>){
         let token=<Readings as Sensing>::TOKEN.to_string();
         match feedback_recv.recv_deadline(now + Duration::from_millis(500)){
             Ok(value) =>{
-                println!("its running");
-                let mut data=object_lock.lock().expect("cannot lock");
                 let ReadingType::RoboticArm(arm, remaining_objects, id)=value;
                 *Arc::make_mut(&mut arm_status)=arm.into();
                 data.push((remaining_objects,token, id));
                 drop(data);
             },
-            Err(RecvTimeoutError)=> println!("Time out"),
+            Err(RecvTimeoutError)=> println!("time out for that thread"),
         }
     }
 
@@ -77,7 +75,7 @@ impl Control for TransmissionChannel{
         loop{
             let value_cloned=Arc::clone(&value);
             if value_cloned.load(Ordering::Acquire)==0{
-                println!("All values have been sent");
+                println!("All Boxes have been lifted");
                 break;
             } 
             let robotic_data_cloned=robotic_data.clone();

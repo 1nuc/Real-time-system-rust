@@ -139,7 +139,8 @@ impl Sensing for Readings{
                 let feedback_recv_cloned=feedback_recv.clone();
                 let arm_status_cloned=Arc::clone(&mut arm_status);
                 thread::spawn(move||{
-                    TransmissionChannel::recieve_transmission_deadline(now, object_copy, arm_status_cloned, feedback_recv_cloned);
+                    let lock=object_copy.lock().expect("unable to lock");
+                    TransmissionChannel::recieve_transmission_deadline(now, lock, arm_status_cloned, feedback_recv_cloned);
                 });
             }
             match Arc::try_unwrap(objects){
