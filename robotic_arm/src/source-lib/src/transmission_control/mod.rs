@@ -1,5 +1,5 @@
 use std::{time::{Duration, Instant},sync::{
-    Arc, Mutex,MutexGuard}, thread,
+    Arc, Mutex,MutexGuard, atomic::{AtomicI32, Ordering}}, thread,
 };
 use crate::{Actuator,Shared,Target, Actual, Control, Sensing, sensor::{ReadingType, Readings}};
 use crossbeam::channel::*;
@@ -29,7 +29,7 @@ impl Control for TransmissionChannel{
           Ok(_)=>{
             println!("Sending Target details...");
             drop(lock);
-            thread::sleep(Duration::from_millis(100));
+            // thread::sleep(Duration::from_millis(100));
           }, 
           Err(_) =>{
               "error while sending, thread run into fail safe mode...";
@@ -57,7 +57,7 @@ impl Control for TransmissionChannel{
     }
     fn recieve_transmission_deadline(now: Instant,object_lock:Arc<Mutex<Vec<(Target, String, i32)>>>, mut arm_status: Arc<Actual>,feedback_recv: Receiver<ReadingType>){
         let token=<Readings as Sensing>::TOKEN.to_string();
-        match feedback_recv.recv_deadline(now + Duration::from_millis(500)){
+        match feedback_recv.recv_deadline(now + Duration::from_millis(50)){
             Ok(value) =>{
                 let mut data=object_lock.lock().expect("cannot lock");
                 let ReadingType::RoboticArm(arm, remaining_objects, id)=value;
@@ -74,8 +74,18 @@ impl Control for TransmissionChannel{
         let sensing_info= Arc::new(Mutex::new((robotic_data.current_state, robotic_data.objects.clone())));
         println!("objects :{}", robotic_data.objects_num);
         let feedback_channel=Self::init();
-        robotic_data.sensor_control(Arc::clone(&sensing_info),self.txes.clone(), feedback_channel.rxes);
-        Pid::actuator_control(Arc::clone(&sensing_info),self.rxes, robotic_data.objects_num, feedback_channel.txes, robotic_data);
-    }
+        let value=Arc::new(AtomicI32::new(robotic_data.objects_num));
+        loop{
+            let value_cloned=Arc::clone(&value);
+            if value_cloned.load(Ordering::Acquire)==0{
+                println!("All values have been sent");
+                break;
+            } 
+            let robotic_data_cloned=robotic_data.clone();
+            robotic_data.sensor_control(Arc::clone(&sensing_info),self.txes.clone(), feedback_channel.rxes.clone(), value_cloned);
+            let value_cloned=Arc::clone(&value);
+            Pid::actuator_control(Arc::clone(&sensing_info),self.rxes.clone(), value_cloned, feedback_channel.txes.clone(), robotic_data_cloned);
+        }
+   }
 }
 

@@ -1,5 +1,5 @@
 use std::{
-    sync::{Arc, Mutex, MutexGuard},
+    sync::{Arc, Mutex, MutexGuard,atomic::{AtomicI32,Ordering}},
     thread, time::{Duration, Instant}};
 use crossbeam::{channel::*};
 
@@ -126,9 +126,9 @@ impl Sensing for Readings{
         }
     }
 
-    fn sensor_control(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>, feedback_recv: Receiver<ReadingType>) {
+    fn sensor_control(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>,feedback_recv: Receiver<ReadingType>, counts: Arc<AtomicI32>) {
         if feedback_recv.is_empty(){
-            self.collect_data(sensing_info ,sensor_send);
+            self.collect_data(sensing_info ,sensor_send, counts);
         }
         else{
             let now=Instant::now();
@@ -147,7 +147,7 @@ impl Sensing for Readings{
                     let object=val.into_inner().unwrap();
                     let arm_unwrapped=Arc::try_unwrap(arm_status).unwrap();
                     let objects_lock=Arc::new(Mutex::new((arm_unwrapped, object)));
-                    self.collect_data(objects_lock, sensor_send);
+                    self.collect_data(objects_lock, sensor_send, counts);
                 },
                 Err(err)=>println!("values cannot be unwrapped: {:?}", err),
             }
@@ -155,8 +155,9 @@ impl Sensing for Readings{
     }
 
     // Collect data in the initial state
-    fn collect_data(&self, sensing_info: Self::Type, sensor_send: Sender<ReadingType>) {
-        for _ in 0..=self.objects.len(){
+    fn collect_data(&self, sensing_info: Self::Type, sensor_send: Sender<ReadingType>, counts: Arc<AtomicI32>) {
+        let value=counts.load(Ordering::Acquire);
+        for _ in 0..=value{
             let tx_copy=sensor_send.clone();
             let packets=Arc::clone(&sensing_info);
             thread::spawn(move ||{
@@ -176,7 +177,7 @@ impl Sensing for Readings{
             None =>{
                 drop(tx_copy);
                 drop(data);
-                println!("No more Targets..Sensor is closing");
+                return
             },
         }
     }
