@@ -75,7 +75,7 @@ impl Control for TransmissionChannel{
         println!("objects :{}", robotic_data.objects_num);
         let feedback_channel=Self::init();
         robotic_data.sensor_control(Arc::clone(&sensing_info),self.txes.clone(), feedback_channel.rxes);
-        Pid::actuator_control(Arc::clone(&sensing_info),self.rxes, robotic_data.objects_num, feedback_channel.txes);
+        Pid::actuator_control(Arc::clone(&sensing_info),self.rxes, robotic_data.objects_num, feedback_channel.txes, robotic_data);
     }
 }
 

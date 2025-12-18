@@ -1,4 +1,4 @@
-use crate::{sensor::{Actual, ReadingType, Target}, transmission_control::TransmissionChannel};
+use crate::{PIDSetup, Sensing, sensor::{Actual, ReadingType, Readings, Target}, transmission_control::TransmissionChannel};
 use crate::{Actions, Actuator, Shared, Control};
 use float_eq::float_eq;
 use crossbeam::channel::*;
@@ -8,16 +8,13 @@ use std::{
             AtomicI32, Ordering}}};
 use advanced_pid::{prelude::*, PidGain, Pid};
 
-impl Actions for PidGain{
+impl PIDSetup for PidGain{
     fn new()-> Self{
         Self{
             kp: 1.0,
             ki: 0.8,
             kd: 0.1,
         }
-    }
-    fn init(_temp: f32, _force: f32, _vel: f32, _pos: f32){
-        
     }
 }
 
@@ -45,7 +42,8 @@ impl<'a> Actuator<'a> for Pid{
         *actual
         
     }
-    fn actuator_control(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>, counts: i32, feedback_send: Sender<ReadingType>) {
+    fn actuator_control(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>,
+        counts: i32, feedback_send: Sender<ReadingType>, robotic_data: Readings) {
         let recv_counts=Arc::new(AtomicI32::new(0));
         loop{
             if recv_counts.load(Ordering::Acquire)==counts{
@@ -63,68 +61,56 @@ impl<'a> Actuator<'a> for Pid{
                     let sensor_recv_cloned=sensor_recv.clone();
                     let feedback_send_cloned=feedback_send.clone();
                     let recv_counts_cloned=Arc::clone(&recv_counts);
+                    let robotic_data_cloned=robotic_data.clone();
                     thread::spawn(move || {
                         match TransmissionChannel::recieve_transmission(sensor_recv_cloned){
                             Some(val)=>{
                                 let lock=receiver_lock.lock().unwrap();
                                 let ReadingType::RoboticArm(arm, object, id)=val;
-                                println!("object {:?}: {:?}", recv_counts_cloned, object);
-                                Self::process_singals(lock, arm, object,recv_counts_cloned, id, feedback_send_cloned);
+                                println!("object Id: {:?} Received", id);
+                                Self::process_singals(lock, arm, object,recv_counts_cloned, id, feedback_send_cloned, robotic_data_cloned);
                             },
                             None => (),
                         } 
                     });
                 }
-                println!("Sent: {counts}, recieved: {:?}", recv_counts);
             }
         }
     }
 
-    fn process_singals(lock: Self::SharedLock<'a>, mut current_arm_status: Actual, mut object_status: Target, recv_counts: Arc<AtomicI32>, id: i32, feedback_send: Sender<ReadingType>){
+    fn process_singals(lock: Self::SharedLock<'a>, mut current_arm_status: Actual, mut object_status: Target,
+        recv_counts: Arc<AtomicI32>, id: i32, feedback_send: Sender<ReadingType>, robotic_data: Readings){
 //TODO: processing Position
-        let mut thread_handler=Vec::new();
         let position=thread::spawn(move||{
-            println!("altering position");
-            Pid::calculate_pid(&mut current_arm_status.position,&mut object_status.position,1, "Position");
-            thread::sleep(Duration::from_millis(10));
+            Pid::calculate_pid(&mut current_arm_status.position,&mut object_status.position,1, "Position")
         }).join().unwrap();
-        // thread_handler.push(position);
 //TODO: processing Temparture
         let temparture=thread::spawn(move || {
-            println!("altering temprature");
-            Pid::calculate_pid(&mut current_arm_status.temperature,&mut object_status.temperature, 1, "Temprature");
-            thread::sleep(Duration::from_millis(10));
+            Pid::calculate_pid(&mut current_arm_status.temperature,&mut object_status.temperature, 1, "Temprature")
         }).join().unwrap();
-        // thread_handler.push(temparture);
 // //TODO: processing Force
         let force=thread::spawn(move || {
-            println!("altering force");
-            Pid::calculate_pid(&mut current_arm_status.force,&mut object_status.force, 1, "Force");
-            thread::sleep(Duration::from_millis(10));
+            Pid::calculate_pid(&mut current_arm_status.force,&mut object_status.force, 1, "Force")
         }).join().unwrap();
-        // thread_handler.push(force);
 //TODO: processing Velocity
         let velocity=thread::spawn(move ||{
-            println!("altering velocity");
-            Pid::calculate_pid(&mut current_arm_status.velocity,&mut object_status.velocity, 1, "Velocity");
-            thread::sleep(Duration::from_millis(10));
+            Pid::calculate_pid(&mut current_arm_status.velocity,&mut object_status.velocity, 1, "Velocity")
         }).join().unwrap();
-        let val: i32=velocity;
-        // thread_handler.push(velocity);
-        // for handle in thread_handler{
-        //     handle.join().unwrap();
-        // }
 
-        Self::process_feedback(position, temparture, force, velocity); 
+        Self::process_feedback(position, temparture, force, velocity, id, robotic_data,feedback_send); 
         recv_counts.fetch_add(1, Ordering::Release);
 
         drop(lock);
-        //TODO: Adding a function to represent the act and delete the from the vector
-        //TODO: only give away the lock once the updated vector is transmitted 
-        //TODO: consider adding the sending function 
     }
-    fn process_feedback(pos: f32, temparture: f32, force: f32, vel: f32) {
-        
+
+    fn process_feedback(pos: f32, temparture: f32, force: f32, vel: f32, id_deleted: i32,
+        mut robotic_data: Readings, feedback_send: Sender<ReadingType>) {
+       let updated_arm_status=Actual::init(temparture, force, vel, pos);
+       println!("Object with ID: {:?} is lifted", id_deleted);
+       println!("Updated Arm stats: {:?}", updated_arm_status);
+       let updated_readings= robotic_data.update_indices(id_deleted, updated_arm_status);
+       let sensing_info= Arc::new(Mutex::new((updated_readings.current_state, updated_readings.objects.clone())));
+       robotic_data.collect_data(sensing_info, feedback_send);
     }
 }
 
