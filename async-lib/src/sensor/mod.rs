@@ -1,9 +1,10 @@
 use std::{
     sync::{Arc, Mutex, MutexGuard,atomic::{AtomicI32,Ordering}},
-    thread, time::{Duration, Instant}};
+    thread, time::{Instant}};
 use crossbeam::{channel::*};
+use manufacturer::{sensing_data::{Actual, Target, Readings}};
 
-use crate::{Actions, Control, Initiation, Sensing, Shared, transmission_control::{self, TransmissionChannel}};
+use crate::{Control, Sensing, Shared, transmission_control::{TransmissionChannel}};
 
 #[derive(Clone, Copy, Debug)]
 pub enum ReadingType{

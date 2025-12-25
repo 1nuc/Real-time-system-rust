@@ -1,10 +1,10 @@
 use std::{time::{Duration, Instant},sync::{
     Arc, Mutex,MutexGuard, atomic::{AtomicI32, Ordering}}, 
 };
-use crate::{Actuator,Actions, Shared,Target, Actual, Control, Sensing, sensor::{ReadingType, Readings}};
+use manufacturer::{Actions,sensing_data::Readings, actuator_data::PID};
+use crate::{Actuator, Shared,Target, Actual, Control, Sensing, sensor::{ReadingType}};
 use crossbeam::channel::*;
-use advanced_pid::{Pid};
-
+#[allow(non_snake_case)]
 pub struct TransmissionChannel{
     pub txes: Sender<ReadingType>,
     pub rxes: Receiver<ReadingType>,
@@ -81,7 +81,7 @@ impl Control for TransmissionChannel{
             let robotic_data_cloned=robotic_data.clone();
             robotic_data.sensor_control(Arc::clone(&sensing_info),self.txes.clone(), feedback_channel.rxes.clone(), value_cloned);
             let value_cloned=Arc::clone(&value);
-            Pid::actuator_control(Arc::clone(&sensing_info),self.rxes.clone(), value_cloned, feedback_channel.txes.clone(), robotic_data_cloned);
+            PID::actuator_control(Arc::clone(&sensing_info),self.rxes.clone(), value_cloned, feedback_channel.txes.clone(), robotic_data_cloned);
         }
    }
 }

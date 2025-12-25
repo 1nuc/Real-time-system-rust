@@ -1,6 +1,7 @@
-use std::{time::Instant,sync::{Arc, atomic::{AtomicI32}, Mutex, MutexGuard}};
+use std::{time::Instant,sync::{Arc, atomic::{AtomicI32},MutexGuard}};
 use crossbeam::{channel::*};
-use crate::sensor::{ReadingType, Target, Actual, Readings};
+use manufacturer::sensing_data::{Actual, Target, Readings};
+use crate::sensor::{ReadingType};
 pub mod sensor;
 pub mod actuator;
 pub mod transmission_control;

@@ -1,19 +1,21 @@
-use crate::{Initiation, PIDSetup, Sensing, sensor::{Actual, ReadingType, Readings, Target}, transmission_control::TransmissionChannel};
-use crate::{Actions, Actuator, Shared, Control};
-use float_eq::float_eq;
+use crate::{Sensing, sensor::{ReadingType}, transmission_control::TransmissionChannel};
+use crate::{Actuator, Shared, Control};
 use crossbeam::channel::*;
 use std::{
     thread, time::Duration, sync::{
         Arc, Mutex, MutexGuard, atomic::{
             AtomicI32, Ordering}}};
 
+use manufacturer::{PIDSetup,actuator_data::PID, Actions, sensing_data::{Target, Actual, Readings}, Initiation};
 
-impl Shared for Pid{
+#[allow(non_snake_case)]
+
+impl Shared for PID{
     // defining the type of the lock for the implementation of this struct
     type Type= Arc<Mutex<(Actual,Vec<(Target,String, i32)>)>>;
     type SharedLock<'a>=MutexGuard<'a, (Actual,Vec<(Target,String, i32)>)>;
 }
-impl<'a> Actuator<'a> for Pid{
+impl<'a> Actuator<'a> for PID{
     fn actuator_control(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>,
         counts: Arc<AtomicI32>, feedback_send: Sender<ReadingType>, robotic_data: Readings) {
             if sensor_recv.is_empty(){
@@ -47,19 +49,19 @@ impl<'a> Actuator<'a> for Pid{
         id: i32, feedback_send: Sender<ReadingType>, robotic_data: Readings, counts: Arc<AtomicI32>){
 //TODO: processing Position
         let position=thread::spawn(move||{
-            PidGain::calculate_pid(&mut current_arm_status.position,&mut object_status.position,1, "Position")
+            PID::calculate_pid(&mut current_arm_status.position,&mut object_status.position,1, "Position")
         }).join().unwrap();
 //TODO: processing Temparture
         let temparture=thread::spawn(move || {
-            PidGain::calculate_pid(&mut current_arm_status.temperature,&mut object_status.temperature, 1, "Temprature")
+            PID::calculate_pid(&mut current_arm_status.temperature,&mut object_status.temperature, 1, "Temprature")
         }).join().unwrap();
 // //TODO: processing Force
         let force=thread::spawn(move || {
-            PidGain::calculate_pid(&mut current_arm_status.force,&mut object_status.force, 1, "Force")
+            PID::calculate_pid(&mut current_arm_status.force,&mut object_status.force, 1, "Force")
         }).join().unwrap();
 //TODO: processing Velocity
         let velocity=thread::spawn(move ||{
-            PidGain::calculate_pid(&mut current_arm_status.velocity,&mut object_status.velocity, 1, "Velocity")
+            PID::calculate_pid(&mut current_arm_status.velocity,&mut object_status.velocity, 1, "Velocity")
         }).join().unwrap();
 
         Self::process_feedback(position, temparture, force, velocity, id, robotic_data,feedback_send, counts); 

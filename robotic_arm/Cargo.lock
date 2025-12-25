@@ -15,6 +15,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
+name = "async-lib"
+version = "0.1.0"
+dependencies = [
+ "advanced-pid",
+ "crossbeam",
+ "float_eq",
+ "manufacturer",
+ "rand",
+ "random-string",
+ "rayon",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -269,6 +282,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "manufacturer"
+version = "0.1.0"
+dependencies = [
+ "advanced-pid",
+ "float_eq",
+ "rand",
+ "random-string",
+]
+
+[[package]]
 name = "memchr"
 version = "2.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -423,13 +446,13 @@ name = "robotic_arm"
 version = "0.1.0"
 dependencies = [
  "advanced-pid",
+ "async-lib",
  "bma-benchmark",
  "float_eq",
  "pid",
  "rand",
  "random-string",
  "rayon",
- "source-lib",
 ]
 
 [[package]]
@@ -462,18 +485,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.108",
-]
-
-[[package]]
-name = "source-lib"
-version = "0.1.0"
-dependencies = [
- "advanced-pid",
- "crossbeam",
- "float_eq",
- "rand",
- "random-string",
- "rayon",
 ]
 
 [[package]]
