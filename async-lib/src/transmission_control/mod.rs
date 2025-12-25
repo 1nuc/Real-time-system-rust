@@ -1,7 +1,7 @@
 use std::{time::{Duration, Instant},sync::{
-    Arc, Mutex,MutexGuard, atomic::{AtomicI32, Ordering}}, thread,
+    Arc, Mutex,MutexGuard, atomic::{AtomicI32, Ordering}}, 
 };
-use crate::{Actuator,Shared,Target, Actual, Control, Sensing, sensor::{ReadingType, Readings}};
+use crate::{Actuator,Actions, Shared,Target, Actual, Control, Sensing, sensor::{ReadingType, Readings}};
 use crossbeam::channel::*;
 use advanced_pid::{Pid};
 
@@ -54,7 +54,7 @@ impl Control for TransmissionChannel{
             }
     }
     fn recieve_transmission_deadline(now: Instant, mut data:MutexGuard<Vec<(Target, String, i32)>>, mut arm_status: Arc<Actual>,feedback_recv: Receiver<ReadingType>){
-        let token=<Readings as Sensing>::TOKEN.to_string();
+        let token=<Readings as Actions>::TOKEN.to_string();
         match feedback_recv.recv_deadline(now + Duration::from_millis(500)){
             Ok(value) =>{
                 let ReadingType::RoboticArm(arm, remaining_objects, id)=value;

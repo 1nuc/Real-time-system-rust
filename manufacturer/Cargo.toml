@@ -1,0 +1,10 @@
+[package]
+name = "manufacturer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+advanced-pid = "0.2.3"
+float_eq = "1.0.1"
+rand = "0.9.2"
+random-string = "1.1.0"
