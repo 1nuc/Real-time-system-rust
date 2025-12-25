@@ -1,5 +1,4 @@
 use crate::{Sensing, sensor::{ReadingType}, transmission_control::TransmissionChannel};
-use tokio::task;
 use crate::{Actuator, Shared, Control};
 use crossbeam::channel::*;
 use std::{
@@ -21,7 +20,7 @@ impl<'a> Actuator<'a> for PID{
         counts: Arc<AtomicI32>, feedback_send: Sender<ReadingType>, robotic_data: Readings) {
             if sensor_recv.is_empty(){
                 println!("No further updates required.. Robotic Arm is updated");
-                task::sleep(Duration::from_millis(200));
+                thread::sleep(Duration::from_millis(200));
             }
             else {
                 let value=counts.load(Ordering::Acquire);
@@ -30,7 +29,7 @@ impl<'a> Actuator<'a> for PID{
                     let sensor_recv_cloned=sensor_recv.clone();
                     let feedback_send_cloned=feedback_send.clone();
                     let robotic_data_cloned=robotic_data.clone();
-                    task::spawn(async move || {
+                    thread::spawn(move || {
                         match TransmissionChannel::recieve_transmission(sensor_recv_cloned){
                             Some(val)=>{
                                 let lock=receiver_lock.lock().unwrap();
@@ -49,19 +48,19 @@ impl<'a> Actuator<'a> for PID{
     fn process_singals(lock: Self::SharedLock<'a>, mut current_arm_status: Actual, mut object_status: Target,
         id: i32, feedback_send: Sender<ReadingType>, robotic_data: Readings, counts: Arc<AtomicI32>){
 //TODO: processing Position
-        let position=task::spawn(move||{
+        let position=thread::spawn(move||{
             PID::calculate_pid(&mut current_arm_status.position,&mut object_status.position,1, "Position")
         }).join().unwrap();
 //TODO: processing Temparture
-        let temparture=task::spawn(move || {
+        let temparture=thread::spawn(move || {
             PID::calculate_pid(&mut current_arm_status.temperature,&mut object_status.temperature, 1, "Temprature")
         }).join().unwrap();
 // //TODO: processing Force
-        let force=task::spawn(move || {
+        let force=thread::spawn(move || {
             PID::calculate_pid(&mut current_arm_status.force,&mut object_status.force, 1, "Force")
         }).join().unwrap();
 //TODO: processing Velocity
-        let velocity=task::spawn(move ||{
+        let velocity=thread::spawn(move ||{
             PID::calculate_pid(&mut current_arm_status.velocity,&mut object_status.velocity, 1, "Velocity")
         }).join().unwrap();
 

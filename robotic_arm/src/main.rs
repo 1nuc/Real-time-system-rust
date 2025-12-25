@@ -1,4 +1,4 @@
-use async_lib::{transmission_control::*, Control};
+use sync_lib::{transmission_control::*, Control};
 use std::hint::black_box;
 use bma_benchmark::benchmark;
 fn main() {
