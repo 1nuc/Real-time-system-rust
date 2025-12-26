@@ -75,8 +75,6 @@ impl Sensing for Readings{
         }
     }
 
-    //send the data through locks
-    // The Aim of this infrustrcture is to easliy track the errors in the code 
 }
 
 

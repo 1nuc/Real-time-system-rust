@@ -1,4 +1,4 @@
-use crate::{Sensing, sensor::{ReadingType}, transmission_control::TransmissionChannel};
+use crate::{Sensing, sensor::{self, ReadingType}, transmission_control::TransmissionChannel};
 use crate::{Actuator, Shared, Control};
 use crossbeam::channel::*;
 use std::{
@@ -18,11 +18,7 @@ impl Shared for PID{
 impl<'a> Actuator<'a> for PID{
     fn actuator_control(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>,
         counts: Arc<AtomicI32>, feedback_send: Sender<ReadingType>, robotic_data: Readings) {
-            if sensor_recv.is_empty(){
-                println!("No further updates required.. Robotic Arm is updated");
-                thread::sleep(Duration::from_millis(200));
-            }
-            else {
+            if !sensor_recv.is_empty(){
                 let value=counts.load(Ordering::Acquire);
                 for _ in 0..value{
                     let receiver_lock=Arc::clone(&sensing_info);
@@ -65,7 +61,6 @@ impl<'a> Actuator<'a> for PID{
         }).join().unwrap();
 
         Self::process_feedback(position, temparture, force, velocity, id, robotic_data,feedback_send, counts); 
-        // recv_counts.fetch_add(1, Ordering::Release);
 
         drop(lock);
     }

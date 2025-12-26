@@ -1,7 +1,7 @@
 use std::{sync::{
-    Arc,atomic::{AtomicI32, Ordering}}, time::{Instant, Duration} 
+    Arc,atomic::{AtomicI32, Ordering}}, time::{Instant} 
 };
-use tokio::{task,sync::{Mutex, MutexGuard}, time::sleep};
+use tokio::{sync::{Mutex, MutexGuard}};
 use manufacturer::{Actions,sensing_data::Readings, actuator_data::PID};
 use crate::{Actuator, Shared,Target, Actual, Control, Sensing, sensor::{ReadingType}};
 use flume::*;

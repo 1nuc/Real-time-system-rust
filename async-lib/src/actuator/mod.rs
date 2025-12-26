@@ -1,5 +1,5 @@
 use crate::{Sensing, sensor::{ReadingType}, transmission_control::TransmissionChannel};
-use tokio::{task, sync::{MutexGuard, Mutex}, time::sleep};
+use tokio::{task, sync::{MutexGuard, Mutex}}; 
 use crate::{Actuator, Shared, Control};
 use flume::*;
 use std::{
@@ -20,32 +20,27 @@ impl<'a> Actuator<'a> for PID{
 
     async fn actuator_control(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>,
         counts: Arc<AtomicI32>, feedback_send: Sender<ReadingType>, robotic_data: Readings) {
-            // if sensor_recv.is_empty(){
-            //     println!("No further updates required.. Robotic Arm is updated");
-            //     sleep(tokio::time::Duration::from_millis(100)).await;
-            // }
-            // else {
-            if !sensor_recv.is_empty(){
-                let value=counts.load(Ordering::Acquire);
-                for _ in 0..value{
-                    let receiver_lock=Arc::clone(&sensing_info);
-                    let sensor_recv_cloned=sensor_recv.clone();
-                    let feedback_send_cloned=feedback_send.clone();
-                    let robotic_data_cloned=robotic_data.clone();
-                    task::spawn(async move{
-                        match TransmissionChannel::recieve_transmission(sensor_recv_cloned).await{
-                            Some(val)=>{
-                                let lock=receiver_lock.lock().await;
-                                let ReadingType::RoboticArm(arm, object, id)=val;
-                                println!("object Id: {:?} Received", id);
-                                Self::process_singals(lock, arm, object, id, feedback_send_cloned, robotic_data_cloned, counts).await;
-                            },
-                            None => (),
-                        } 
-                    });
-                    return;
-                }
+        if !sensor_recv.is_empty(){
+            let value=counts.load(Ordering::Acquire);
+            for _ in 0..value{
+                let receiver_lock=Arc::clone(&sensing_info);
+                let sensor_recv_cloned=sensor_recv.clone();
+                let feedback_send_cloned=feedback_send.clone();
+                let robotic_data_cloned=robotic_data.clone();
+                task::spawn(async move{
+                    match TransmissionChannel::recieve_transmission(sensor_recv_cloned).await{
+                        Some(val)=>{
+                            let lock=receiver_lock.lock().await;
+                            let ReadingType::RoboticArm(arm, object, id)=val;
+                            println!("object Id: {:?} Received", id);
+                            Self::process_singals(lock, arm, object, id, feedback_send_cloned, robotic_data_cloned, counts).await;
+                        },
+                        None => (),
+                    } 
+                });
+                return;
             }
+        }
     }
 
     async fn process_singals(lock: Self::SharedLock<'a>, mut current_arm_status: Actual, mut object_status: Target,
@@ -68,7 +63,6 @@ impl<'a> Actuator<'a> for PID{
         }).await.unwrap();
 
         Self::process_feedback(position, temparture, force, velocity, id, robotic_data,feedback_send, counts).await; 
-        // recv_counts.fetch_add(1, Ordering::Release);
 
         drop(lock);
     }
