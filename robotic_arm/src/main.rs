@@ -10,7 +10,7 @@ async fn main() {
         // simulation.simulation_control();
     // });
     let simulation=transmission_control::TransmissionChannel::init();
-    simulation.simulation_control();
+    simulation.simulation_control().await;
     
 }
 

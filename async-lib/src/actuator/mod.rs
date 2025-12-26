@@ -1,27 +1,28 @@
 use crate::{Sensing, sensor::{ReadingType}, transmission_control::TransmissionChannel};
-use tokio::{task, time::sleep, sync::{MutexGuard, Mutex}};
+use tokio::{task, sync::{MutexGuard, Mutex}, time::sleep};
 use crate::{Actuator, Shared, Control};
 use flume::*;
 use std::{
-    time::Duration, sync::{
+    sync::{
         Arc, atomic::{
             AtomicI32, Ordering}}};
 
 use manufacturer::{PIDSetup,actuator_data::PID, Actions, sensing_data::{Target, Actual, Readings}, Initiation};
 
-#[allow(non_snake_case)]
 
 impl Shared for PID{
     // defining the type of the lock for the implementation of this struct
     type Type= Arc<Mutex<(Actual,Vec<(Target,String, i32)>)>>;
     type SharedLock<'a>=MutexGuard<'a, (Actual,Vec<(Target,String, i32)>)>;
 }
+#[allow(non_snake_case)]
 impl<'a> Actuator<'a> for PID{
+
     async fn actuator_control(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>,
         counts: Arc<AtomicI32>, feedback_send: Sender<ReadingType>, robotic_data: Readings) {
             if sensor_recv.is_empty(){
                 println!("No further updates required.. Robotic Arm is updated");
-                sleep(Duration::from_millis(200));
+                sleep(tokio::time::Duration::from_millis(100)).await;
             }
             else {
                 let value=counts.load(Ordering::Acquire);
@@ -36,7 +37,7 @@ impl<'a> Actuator<'a> for PID{
                                 let lock=receiver_lock.lock().await;
                                 let ReadingType::RoboticArm(arm, object, id)=val;
                                 println!("object Id: {:?} Received", id);
-                                Self::process_singals(lock, arm, object, id, feedback_send_cloned, robotic_data_cloned, counts);
+                                Self::process_singals(lock, arm, object, id, feedback_send_cloned, robotic_data_cloned, counts).await;
                             },
                             None => (),
                         } 
@@ -65,7 +66,7 @@ impl<'a> Actuator<'a> for PID{
             PID::calculate_pid(&mut current_arm_status.velocity,&mut object_status.velocity, 1, "Velocity")
         }).await.unwrap();
 
-        Self::process_feedback(position, temparture, force, velocity, id, robotic_data,feedback_send, counts); 
+        Self::process_feedback(position, temparture, force, velocity, id, robotic_data,feedback_send, counts).await; 
         // recv_counts.fetch_add(1, Ordering::Release);
 
         drop(lock);
@@ -79,7 +80,8 @@ impl<'a> Actuator<'a> for PID{
        let updated_readings= robotic_data.update_indices(id_deleted, updated_arm_status);
        let sensing_info= Arc::new(Mutex::new((updated_readings.current_state, updated_readings.objects.clone())));
        counts.fetch_sub(1, Ordering::Release);
-       robotic_data.collect_data(sensing_info, feedback_send, counts);
+       println!("remaining objects: {:?}", counts);
+       robotic_data.collect_data(sensing_info, feedback_send, counts).await;
     }
 }
 

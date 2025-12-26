@@ -1,11 +1,10 @@
-use std::{time::{Duration, Instant},sync::{
-    Arc,atomic::{AtomicI32, Ordering}} 
+use std::{sync::{
+    Arc,atomic::{AtomicI32, Ordering}}, time::{Instant, Duration} 
 };
-use tokio::sync::{Mutex, MutexGuard};
+use tokio::{sync::{Mutex, MutexGuard}, time::sleep};
 use manufacturer::{Actions,sensing_data::Readings, actuator_data::PID};
 use crate::{Actuator, Shared,Target, Actual, Control, Sensing, sensor::{ReadingType}};
 use flume::*;
-#[allow(non_snake_case)]
 pub struct TransmissionChannel{
     pub txes: Sender<ReadingType>,
     pub rxes: Receiver<ReadingType>,
@@ -16,6 +15,8 @@ impl Shared for TransmissionChannel{
     type Type= Arc<Mutex<(Actual,Vec<(Target,String, i32)>)>>;
 }
 
+#[allow(non_snake_case)]
+#[allow(unused_variables)]
 impl Control for TransmissionChannel{
     fn init()-> Self{
         let (tx, rx) = unbounded::<ReadingType>();
@@ -63,11 +64,14 @@ impl Control for TransmissionChannel{
                 data.push((remaining_objects,token, id));
                 drop(data);
             },
-            Err(RecvTimeoutError)=> println!("time out for that thread"),
+            Err(RecvTimeoutError)=> {
+                println!("time out for that thread");
+                sleep(tokio::time::Duration::from_millis(100)).await;
+            }
         }
     }
 
-    fn simulation_control(self){
+    async fn simulation_control(self){
         let robotic_data=Readings::assign_data(30).filter_noise();
         let sensing_info= Arc::new(Mutex::new((robotic_data.current_state, robotic_data.objects.clone())));
         println!("objects :{}", robotic_data.objects_num);
@@ -80,9 +84,9 @@ impl Control for TransmissionChannel{
                 break;
             } 
             let robotic_data_cloned=robotic_data.clone();
-            robotic_data.sensor_control(Arc::clone(&sensing_info),self.txes.clone(), feedback_channel.rxes.clone(), value_cloned);
+            robotic_data.sensor_control(Arc::clone(&sensing_info),self.txes.clone(), feedback_channel.rxes.clone(), value_cloned).await;
             let value_cloned=Arc::clone(&value);
-            PID::actuator_control(Arc::clone(&sensing_info),self.rxes.clone(), value_cloned, feedback_channel.txes.clone(), robotic_data_cloned);
+            PID::actuator_control(Arc::clone(&sensing_info),self.rxes.clone(), value_cloned, feedback_channel.txes.clone(), robotic_data_cloned).await;
         }
    }
 }
