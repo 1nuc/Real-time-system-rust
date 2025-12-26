@@ -1,10 +1,10 @@
 use crate::{Sensing, sensor::{ReadingType}, transmission_control::TransmissionChannel};
-use tokio::task;
+use tokio::{task, time::sleep, sync::{MutexGuard, Mutex}};
 use crate::{Actuator, Shared, Control};
-use crossbeam::channel::*;
+use flume::*;
 use std::{
-    thread, time::Duration, sync::{
-        Arc, Mutex, MutexGuard, atomic::{
+    time::Duration, sync::{
+        Arc, atomic::{
             AtomicI32, Ordering}}};
 
 use manufacturer::{PIDSetup,actuator_data::PID, Actions, sensing_data::{Target, Actual, Readings}, Initiation};
@@ -17,11 +17,11 @@ impl Shared for PID{
     type SharedLock<'a>=MutexGuard<'a, (Actual,Vec<(Target,String, i32)>)>;
 }
 impl<'a> Actuator<'a> for PID{
-    fn actuator_control(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>,
+    async fn actuator_control(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>,
         counts: Arc<AtomicI32>, feedback_send: Sender<ReadingType>, robotic_data: Readings) {
             if sensor_recv.is_empty(){
                 println!("No further updates required.. Robotic Arm is updated");
-                task::sleep(Duration::from_millis(200));
+                sleep(Duration::from_millis(200));
             }
             else {
                 let value=counts.load(Ordering::Acquire);
@@ -31,9 +31,9 @@ impl<'a> Actuator<'a> for PID{
                     let feedback_send_cloned=feedback_send.clone();
                     let robotic_data_cloned=robotic_data.clone();
                     task::spawn(async move || {
-                        match TransmissionChannel::recieve_transmission(sensor_recv_cloned){
+                        match TransmissionChannel::recieve_transmission(sensor_recv_cloned).await{
                             Some(val)=>{
-                                let lock=receiver_lock.lock().unwrap();
+                                let lock=receiver_lock.lock().await;
                                 let ReadingType::RoboticArm(arm, object, id)=val;
                                 println!("object Id: {:?} Received", id);
                                 Self::process_singals(lock, arm, object, id, feedback_send_cloned, robotic_data_cloned, counts);
@@ -46,24 +46,24 @@ impl<'a> Actuator<'a> for PID{
             }
     }
 
-    fn process_singals(lock: Self::SharedLock<'a>, mut current_arm_status: Actual, mut object_status: Target,
+    async fn process_singals(lock: Self::SharedLock<'a>, mut current_arm_status: Actual, mut object_status: Target,
         id: i32, feedback_send: Sender<ReadingType>, robotic_data: Readings, counts: Arc<AtomicI32>){
 //TODO: processing Position
         let position=task::spawn(move||{
             PID::calculate_pid(&mut current_arm_status.position,&mut object_status.position,1, "Position")
-        }).join().unwrap();
+        }).await.unwrap();
 //TODO: processing Temparture
         let temparture=task::spawn(move || {
             PID::calculate_pid(&mut current_arm_status.temperature,&mut object_status.temperature, 1, "Temprature")
-        }).join().unwrap();
+        }).await.unwrap();
 // //TODO: processing Force
         let force=task::spawn(move || {
             PID::calculate_pid(&mut current_arm_status.force,&mut object_status.force, 1, "Force")
-        }).join().unwrap();
+        }).await.unwrap();
 //TODO: processing Velocity
         let velocity=task::spawn(move ||{
             PID::calculate_pid(&mut current_arm_status.velocity,&mut object_status.velocity, 1, "Velocity")
-        }).join().unwrap();
+        }).await.unwrap();
 
         Self::process_feedback(position, temparture, force, velocity, id, robotic_data,feedback_send, counts); 
         // recv_counts.fetch_add(1, Ordering::Release);
@@ -71,7 +71,7 @@ impl<'a> Actuator<'a> for PID{
         drop(lock);
     }
 
-    fn process_feedback(pos: f32, temparture: f32, force: f32, vel: f32, id_deleted: i32,
+    async fn process_feedback(pos: f32, temparture: f32, force: f32, vel: f32, id_deleted: i32,
         mut robotic_data: Readings, feedback_send: Sender<ReadingType>, counts: Arc<AtomicI32>) {
        let updated_arm_status=Initiation::init(temparture, force, vel, pos);
        println!("Object with ID: {:?} is lifted", id_deleted);

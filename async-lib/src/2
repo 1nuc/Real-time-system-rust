@@ -32,14 +32,14 @@ impl Sensing for Readings{
                 let feedback_recv_cloned=feedback_recv.clone();
                 let arm_status_cloned=Arc::clone(&mut arm_status);
                 task::spawn(async move||{
-                    let lock=object_copy.lock().await;
-                    TransmissionChannel::recieve_transmission_deadline(now, lock, arm_status_cloned, feedback_recv_cloned).await;
+                    let lock=object_copy.lock().expect("unable to lock");
+                    TransmissionChannel::recieve_transmission_deadline(now, lock, arm_status_cloned, feedback_recv_cloned);
                 });
             }
             match Arc::try_unwrap(objects){
                 Ok(val)=>{
                     println!("Objects are safe");
-                    let object=val.into_inner();
+                    let object=val.into_inner().await;
                     let arm_unwrapped=Arc::try_unwrap(arm_status).unwrap();
                     let objects_lock=Arc::new(Mutex::new((arm_unwrapped, object)));
                     self.collect_data(objects_lock, sensor_send, counts);
@@ -64,7 +64,7 @@ impl Sensing for Readings{
     
     //start threads to send the data through packets
     async fn sensor_workflow(packets: Self::Type, tx_copy: Sender<ReadingType>){
-        let mut data=packets.lock().await;
+        let mut data=packets.lock().expect("error while locking");
         match data.1.pop(){
             Some(value) =>{
                 TransmissionChannel::transmit_data(ReadingType::RoboticArm(data.0, value.0, value.2), tx_copy, data);

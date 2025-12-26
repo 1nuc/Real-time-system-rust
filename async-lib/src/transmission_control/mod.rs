@@ -1,10 +1,10 @@
 use std::{time::{Duration, Instant},sync::{
-    Arc, Mutex,MutexGuard, atomic::{AtomicI32, Ordering}}, 
+    Arc,atomic::{AtomicI32, Ordering}}, 
 };
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, MutexGuard};
 use manufacturer::{Actions,sensing_data::Readings, actuator_data::PID};
 use crate::{Actuator, Shared,Target, Actual, Control, Sensing, sensor::{ReadingType}};
-use crossbeam::channel::*;
+use flume::*;
 #[allow(non_snake_case)]
 pub struct TransmissionChannel{
     pub txes: Sender<ReadingType>,
@@ -25,8 +25,8 @@ impl Control for TransmissionChannel{
         }
     } 
 
-    fn transmit_data<'a>(data: ReadingType, sensor_send: Sender<ReadingType>, lock: Self::SharedLock<'a>){
-       match sensor_send.send(data){
+    async fn transmit_data<'a>(data: ReadingType, sensor_send: Sender<ReadingType>, lock: Self::SharedLock<'a>){
+       match sensor_send.send_async(data).await{
           Ok(_)=>{
             println!("Sending Target details...");
             drop(lock);
@@ -40,9 +40,9 @@ impl Control for TransmissionChannel{
        } 
     }
 
-    fn recieve_transmission(sensor_recv: Receiver<ReadingType>)->Option<ReadingType> 
+    async fn recieve_transmission(sensor_recv: Receiver<ReadingType>)->Option<ReadingType> 
 {
-            match sensor_recv.recv(){
+            match sensor_recv.recv_async().await{
                 Ok(value) => {
                     println!("Readings recieved...");
                     Some(value)
@@ -54,7 +54,7 @@ impl Control for TransmissionChannel{
                 },
             }
     }
-    fn recieve_transmission_deadline(now: Instant, mut data:MutexGuard<Vec<(Target, String, i32)>>, mut arm_status: Arc<Actual>,feedback_recv: Receiver<ReadingType>){
+    async fn recieve_transmission_deadline(now: Instant, mut data:MutexGuard<Vec<(Target, String, i32)>>, mut arm_status: Arc<Actual>,feedback_recv: Receiver<ReadingType>){
         let token=<Readings as Actions>::TOKEN.to_string();
         match feedback_recv.recv_deadline(now + Duration::from_millis(500)){
             Ok(value) =>{
