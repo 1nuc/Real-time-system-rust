@@ -8,13 +8,13 @@ use std::{
 
 use manufacturer::{PIDSetup,actuator_data::PID, Actions, sensing_data::{Target, Actual, Readings}, Initiation};
 
-#[allow(non_snake_case)]
 
 impl Shared for PID{
     // defining the type of the lock for the implementation of this struct
     type Type= Arc<Mutex<(Actual,Vec<(Target,String, i32)>)>>;
     type SharedLock<'a>=MutexGuard<'a, (Actual,Vec<(Target,String, i32)>)>;
 }
+#[allow(non_snake_case)]
 impl<'a> Actuator<'a> for PID{
     fn actuator_control(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>,
         counts: Arc<AtomicI32>, feedback_send: Sender<ReadingType>, robotic_data: Readings) {
@@ -49,19 +49,19 @@ impl<'a> Actuator<'a> for PID{
         id: i32, feedback_send: Sender<ReadingType>, robotic_data: Readings, counts: Arc<AtomicI32>){
 //TODO: processing Position
         let position=thread::spawn(move||{
-            PID::calculate_pid(&mut current_arm_status.position,&mut object_status.position,1, "Position")
+            PID::calculate_pid(&mut current_arm_status.position,&mut object_status.position, "Position")
         }).join().unwrap();
 //TODO: processing Temparture
         let temparture=thread::spawn(move || {
-            PID::calculate_pid(&mut current_arm_status.temperature,&mut object_status.temperature, 1, "Temprature")
+            PID::calculate_pid(&mut current_arm_status.temperature,&mut object_status.temperature,  "Temprature")
         }).join().unwrap();
 // //TODO: processing Force
         let force=thread::spawn(move || {
-            PID::calculate_pid(&mut current_arm_status.force,&mut object_status.force, 1, "Force")
+            PID::calculate_pid(&mut current_arm_status.force,&mut object_status.force, "Force")
         }).join().unwrap();
 //TODO: processing Velocity
         let velocity=thread::spawn(move ||{
-            PID::calculate_pid(&mut current_arm_status.velocity,&mut object_status.velocity, 1, "Velocity")
+            PID::calculate_pid(&mut current_arm_status.velocity,&mut object_status.velocity, "Velocity")
         }).join().unwrap();
 
         Self::process_feedback(position, temparture, force, velocity, id, robotic_data,feedback_send, counts); 

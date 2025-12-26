@@ -18,5 +18,5 @@ pub trait Actions {
 }
 pub trait PIDSetup{
     fn new() -> Self;
-    fn calculate_pid<'a>(actual: &mut f32, target: &mut f32, elapsed_mil: u64, measurment: &'a str) -> f32;
+    fn calculate_pid<'a>(actual: &mut f32, target: &mut f32, measurment: &'a str) -> f32;
 }

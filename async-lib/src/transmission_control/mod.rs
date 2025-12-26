@@ -1,7 +1,7 @@
 use std::{sync::{
     Arc,atomic::{AtomicI32, Ordering}}, time::{Instant, Duration} 
 };
-use tokio::{sync::{Mutex, MutexGuard}, time::sleep};
+use tokio::{task,sync::{Mutex, MutexGuard}, time::sleep};
 use manufacturer::{Actions,sensing_data::Readings, actuator_data::PID};
 use crate::{Actuator, Shared,Target, Actual, Control, Sensing, sensor::{ReadingType}};
 use flume::*;
@@ -57,18 +57,19 @@ impl Control for TransmissionChannel{
     }
     async fn recieve_transmission_deadline<'a>(now: Instant, mut data:MutexGuard<'a,Vec<(Target, String, i32)>>, mut arm_status: Arc<Actual>,feedback_recv: Receiver<ReadingType>){
         let token=<Readings as Actions>::TOKEN.to_string();
-        match feedback_recv.recv_deadline(now + Duration::from_millis(500)){
+        // match feedback_recv.recv_deadline(now + Duration::from_millis(500)){
+        match feedback_recv.recv_async().await{
             Ok(value) =>{
                 let ReadingType::RoboticArm(arm, remaining_objects, id)=value;
                 *Arc::make_mut(&mut arm_status)=arm.into();
                 data.push((remaining_objects,token, id));
                 drop(data);
             },
-            Err(RecvTimeoutError)=> {
-                println!("time out for that thread");
-                sleep(tokio::time::Duration::from_millis(100)).await;
+            Err(e)=> {
+                println!("Error In receiving, {:?}", e);
             }
         }
+        drop(feedback_recv);
     }
 
     async fn simulation_control(self){
