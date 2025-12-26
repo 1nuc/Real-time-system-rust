@@ -1,5 +1,5 @@
 use std::{time::{Duration, Instant},sync::{
-    Arc,atomic::{AtomicI32, Ordering}}, 
+    Arc,atomic::{AtomicI32, Ordering}} 
 };
 use tokio::sync::{Mutex, MutexGuard};
 use manufacturer::{Actions,sensing_data::Readings, actuator_data::PID};
@@ -54,7 +54,7 @@ impl Control for TransmissionChannel{
                 },
             }
     }
-    async fn recieve_transmission_deadline(now: Instant, mut data:MutexGuard<Vec<(Target, String, i32)>>, mut arm_status: Arc<Actual>,feedback_recv: Receiver<ReadingType>){
+    async fn recieve_transmission_deadline<'a>(now: Instant, mut data:MutexGuard<'a,Vec<(Target, String, i32)>>, mut arm_status: Arc<Actual>,feedback_recv: Receiver<ReadingType>){
         let token=<Readings as Actions>::TOKEN.to_string();
         match feedback_recv.recv_deadline(now + Duration::from_millis(500)){
             Ok(value) =>{

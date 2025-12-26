@@ -30,7 +30,7 @@ impl<'a> Actuator<'a> for PID{
                     let sensor_recv_cloned=sensor_recv.clone();
                     let feedback_send_cloned=feedback_send.clone();
                     let robotic_data_cloned=robotic_data.clone();
-                    task::spawn(async move || {
+                    task::spawn(async move{
                         match TransmissionChannel::recieve_transmission(sensor_recv_cloned).await{
                             Some(val)=>{
                                 let lock=receiver_lock.lock().await;
@@ -49,19 +49,19 @@ impl<'a> Actuator<'a> for PID{
     async fn process_singals(lock: Self::SharedLock<'a>, mut current_arm_status: Actual, mut object_status: Target,
         id: i32, feedback_send: Sender<ReadingType>, robotic_data: Readings, counts: Arc<AtomicI32>){
 //TODO: processing Position
-        let position=task::spawn(move||{
+        let position=task::spawn(async move{
             PID::calculate_pid(&mut current_arm_status.position,&mut object_status.position,1, "Position")
         }).await.unwrap();
 //TODO: processing Temparture
-        let temparture=task::spawn(move || {
+        let temparture=task::spawn(async move{
             PID::calculate_pid(&mut current_arm_status.temperature,&mut object_status.temperature, 1, "Temprature")
         }).await.unwrap();
 // //TODO: processing Force
-        let force=task::spawn(move || {
+        let force=task::spawn(async move{
             PID::calculate_pid(&mut current_arm_status.force,&mut object_status.force, 1, "Force")
         }).await.unwrap();
 //TODO: processing Velocity
-        let velocity=task::spawn(move ||{
+        let velocity=task::spawn(async move{
             PID::calculate_pid(&mut current_arm_status.velocity,&mut object_status.velocity, 1, "Velocity")
         }).await.unwrap();
 

@@ -31,7 +31,7 @@ impl Sensing for Readings{
                 let object_copy=Arc::clone(&mut objects);
                 let feedback_recv_cloned=feedback_recv.clone();
                 let arm_status_cloned=Arc::clone(&mut arm_status);
-                task::spawn(async move||{
+                task::spawn(async move{
                     let lock=object_copy.lock().await;
                     TransmissionChannel::recieve_transmission_deadline(now, lock, arm_status_cloned, feedback_recv_cloned).await;
                 });
@@ -55,7 +55,7 @@ impl Sensing for Readings{
         for _ in 0..=value{
             let tx_copy=sensor_send.clone();
             let packets=Arc::clone(&sensing_info);
-            task::spawn(async move ||{
+            task::spawn(async move {
                 Self::sensor_workflow(packets, tx_copy);
             });
         }
