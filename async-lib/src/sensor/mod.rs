@@ -35,6 +35,7 @@ impl Sensing for Readings{
                 task::spawn(async move{
                     let lock=object_copy.lock().await;
                     TransmissionChannel::recieve_transmission_deadline(now.into(), lock, arm_status_cloned, feedback_recv_cloned).await;
+                    //TODO: Add timeout function
                 });
             }
             match Arc::try_unwrap(objects){
