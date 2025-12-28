@@ -1,0 +1,17 @@
+name: rabbit_mq
+
+services:
+  rabbit_mq:
+    image: rabbitmq:4-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    restart: always
+    networks:
+      - rabbit_net
+
+networks:
+  rabbit_net:
+    driver: bridge 
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"
