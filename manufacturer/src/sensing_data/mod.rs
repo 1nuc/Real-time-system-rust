@@ -1,6 +1,6 @@
 use crate::{Initiation, Actions};
-
-#[derive(Clone, Copy, Debug)]
+use serde::{Serialize, Deserialize};
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Actual{ 
     pub force: f32,
     pub velocity: f32,
@@ -27,7 +27,7 @@ impl Initiation for Actual{
     }
 } 
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize,Deserialize)]
 pub struct Target{ 
     pub force: f32,
     pub velocity: f32,
@@ -54,7 +54,7 @@ impl Initiation for Target{
     }
 } 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Readings {
     pub objects: Vec<(Target,String,i32)>, //each object contains the required info to be lifted 
     pub current_state: Actual, //as well as the token and ID

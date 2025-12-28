@@ -1,7 +1,8 @@
 use tokio::{*, time::sleep};
 use futures_lite::stream::StreamExt;
 use lapin::{types::FieldTable, *, options::*};
-
+use serde_json;
+use manufacturer::{sensing_data::{Actual, Target}, *};
 use std::time::Duration;
 async fn create_connection()-> Connection{
     let addr="amqp://guest:guest@localhost:5672";
@@ -28,7 +29,9 @@ async fn main() {
     }
     while let Some(msg)=consumer.clone().unwrap().next().await{
         if let Ok(msg)=msg{
-            println!("Message recieved, {:?}", msg.data);
+            println!("income data: {:?}", msg.data);
+            let data=serde_json::from_slice::<(Actual, Vec<(Target,String,i32)>)>(&(msg.data)).expect("Unable to serialize the data");
+            println!("Message recieved, {:?}", data);
             msg.acker.ack(BasicAckOptions::default()).await;
         }
     }
