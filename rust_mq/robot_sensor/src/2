@@ -1,4 +1,5 @@
 use lapin::{options::*, publisher_confirm::Confirmation, types::FieldTable, *};
+// use lapin_futures_openssl::lapin::channel::{BasicPublishOptions, QueueDeclareOptions};
 use tokio::{time::sleep, *};
 use std::time::Duration;
 
@@ -16,7 +17,6 @@ async fn create_connection()-> Connection{
     
 }
 
-#[allow(unused_variables)]
 #[tokio::main]
 async fn main() {
     
@@ -25,21 +25,19 @@ async fn main() {
     //create a communication channel
     let channel=connection.create_channel().await.expect("error in creating a channel");
 
-    channel.queue_declare("sensing_data",QueueDeclareOptions::default(), FieldTable::default()).await;
-    let confirmation=channel.basic_publish("", "sensing_data", BasicPublishOptions::default(), &[2,24,4,4,2],BasicProperties::default()).await.expect("error");
-    let confirmed=confirmation.await.expect("error");
-    match confirmed{
-        publisher_confirm::Confirmation::Ack(msg)=>{
+    channel.queue_declare("Sesning info",QueueDeclareOptions::default(), FieldTable::default()).await;
+    let confirmation=channel.basic_publish("", "message", BasicPublishOptions::default(), &[2,24,4,4,2],BasicProperties::default()).await;
+    match confirmation.await{
+        Confirmation::Ack(msg)=>{
             println!("Message has been confirmed");
         },
-        publisher_confirm::Confirmation::Nack(msg)=>{
+        Confirmation::Nack(msg)=>{
             println!("Message has not yet been confirmed");
         },
-        publisher_confirm::Confirmation::NotRequested=>{
+        Confirmation::NotRequested=>{
             println!("Message is waiting to be requested");
         }
     }
     println!("Message has been sent");
 
-    signal::ctrl_c().await.expect("failed");
 }
