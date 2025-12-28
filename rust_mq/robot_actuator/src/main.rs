@@ -29,8 +29,7 @@ async fn main() {
     }
     while let Some(msg)=consumer.clone().unwrap().next().await{
         if let Ok(msg)=msg{
-            println!("income data: {:?}", msg.data);
-            let data=serde_json::from_slice::<(Actual, Vec<(Target,String,i32)>)>(&(msg.data)).expect("Unable to serialize the data");
+            let data=serde_json::from_slice::<(Actual, (Target,String,i32))>(&(msg.data)).expect("Unable to serialize the data");
             println!("Message recieved, {:?}", data);
             msg.acker.ack(BasicAckOptions::default()).await;
         }

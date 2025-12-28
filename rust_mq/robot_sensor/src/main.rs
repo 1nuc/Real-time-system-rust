@@ -58,12 +58,10 @@ async fn main() {
                         }
                     }
                     counter_cloned.fetch_sub(1,Ordering::Release);
-                    sleep(Duration::from_millis(200)).await;
                 },
                 None =>{
                     println!("All boxes have been sent");
                     drop(data);
-                    return;
                 }
             }
         });
