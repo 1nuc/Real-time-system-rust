@@ -43,7 +43,8 @@ async fn main() {
             let mut data=packets_cloned.lock().await;
             match data.1.pop(){
                 Some(val)=>{
-                    let data_sered=serde_json::to_vec(&(data.0, val)).expect("unable to serialize the data");
+                    let data_sered=serde_json::to_vec(&sensor::ReadingType::RoboticArm(data.0, val.0, val.2)
+                        ).expect("unable to serialize the data");
                     let confirmation=channel_clone.basic_publish("", "sensing_data", BasicPublishOptions::default(), &data_sered,BasicProperties::default()).await.expect("error");
                     let confirmed=confirmation.await.expect("error");
                     match confirmed{

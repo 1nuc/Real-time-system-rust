@@ -1,5 +1,11 @@
 use tokio::*;
-use manufacturer::*;
+use manufacturer::{sensing_data::{Actual, Target}, *};
+use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize)]
+pub enum ReadingType{
+    RoboticArm(Actual,Target, i32),
+} 
 
 async fn prepare_data(){
     //assign 50 boxes of data
