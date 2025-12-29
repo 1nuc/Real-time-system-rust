@@ -35,6 +35,7 @@ async fn main() {
     let counter=Arc::new(AtomicI32::new(objects.objects_num));
     let counter_cloned=Arc::clone(&counter);
     let value= counter_cloned.load(Ordering::Acquire);
+    println!("Sending:{:?} objects", value);
     for i in 0..value{
         let channel_clone=channel.clone();
         let counter_cloned=Arc::clone(&counter);
