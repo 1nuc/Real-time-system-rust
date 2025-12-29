@@ -24,23 +24,23 @@ async fn main() {
     let connection=create_connection().await;
     let channel=connection.create_channel().await.expect("error in creating a channel");
     let mut consumer= channel.basic_consume("sensing_data", "Actuator", BasicConsumeOptions::default(), FieldTable::default()).await;
-    let queue=channel.queue_declare("sensing_data",QueueDeclareOptions::default(), FieldTable::default()).await.expect("unable to read from the queue");
+    let queue_options=QueueDeclareOptions{
+        passive: false,
+        ..QueueDeclareOptions::default()
+    };
+    let queue=channel.queue_declare("sensing_data",queue_options, FieldTable::default()).await.expect("unable to read from the queue");
     while consumer.is_err(){
          println!("Waiting for a message to recieve");
          consumer= channel.basic_consume("sensing_data", "consumer", BasicConsumeOptions::default(), FieldTable::default()).await;
          sleep(Duration::from_secs(2)).await;
     }
-
-    while queue.message_count()!=0{
-        let consumer_cloned=consumer.clone();
+    while let Some(msg)=consumer.clone().unwrap().next().await{
         task::spawn(async move {
-            if let Some(msg)=consumer_cloned.unwrap().next().await{
                 if let Ok(msg)=msg{
                     let actuator::ReadingType::RoboticArm(arm,object,id)=serde_json::from_slice::<actuator::ReadingType>(&(msg.data)).expect("Unable to serialize the data");
                     println!("Message recieved, Arm current position:{:?}, Objcet with ID:{:?}, stats:{:?}",arm, id, object);
                     msg.acker.ack(BasicAckOptions::default()).await;
                 }
-            }
         });
     }
     
