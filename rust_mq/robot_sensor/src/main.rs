@@ -9,7 +9,7 @@ async fn main() {
     let connection= Arc::new(sensor::create_connection().await);
     //create a communication channel
     let connection_cloned=Arc::clone(&connection);
-    let channel=sensor::create_channel(connection_cloned).await;
-    sensor::sensor_control(channel, connection).await;
+    let channel=sensor::create_channel(connection).await;
+    sensor::sensor_control(channel, connection_cloned).await;
     signal::ctrl_c().await.expect("failed");
 }

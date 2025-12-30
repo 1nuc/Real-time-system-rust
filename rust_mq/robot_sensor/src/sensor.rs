@@ -42,6 +42,7 @@ async fn get_confirmation(confirmed: Confirmation)-> String{
 pub async fn create_channel(connection: Arc<Connection>)-> Channel{
     let channel=connection.create_channel().await.expect("error in creating a channel");
     let _=channel.confirm_select(ConfirmSelectOptions::default()).await;
+    // let _=channel.queue_delete("feedback_data", QueueDeleteOptions::default()).await.expect("unable to delete the queue");
     let _=channel.queue_declare("sensing_data",QueueDeclareOptions::default(), FieldTable::default()).await;
     channel
 }
@@ -63,7 +64,7 @@ async fn handle_transmission(channel: Channel,counter: Arc<AtomicI32>, arm_data:
 async fn handle_feedback(consumer: Result<Consumer>)-> Vec<(Actual, Target,i32)>{
     let mut data_vec=vec![];
     loop{
-        match timeout(Duration::from_secs(1), consumer.clone().expect("Error retreiving the data").next()).await{
+        match timeout(Duration::from_millis(500), consumer.clone().expect("Error retreiving the data").next()).await{
             Ok(Some(msg))=>{
                 if let Ok(msg)=msg{
                     let ReadingType::RoboticArm(arm,object,id)=serde_json::from_slice::<ReadingType>(&(msg.data)).expect("Unable to serialize the data");
@@ -109,30 +110,30 @@ pub async fn sensing(channel: Channel, data: Arc<Mutex<(Actual, Vec<(Target, Str
 }
 
 pub async fn sensor_control(channel: Channel, connection: Arc<Connection>){
+    let objects=sensing_data::Readings::assign_data(50).filter_noise();
+    let packets=Arc::new(Mutex::new((objects.current_state, objects.objects.clone())));
+    let counter=Arc::new(AtomicI32::new(objects.objects_num));
+    sensing(channel, packets, counter).await;
+    let channel=create_channel(Arc::clone(&connection)).await;
     loop{
-        let consumer= channel.clone().basic_consume("feedback_data", "Actuator", BasicConsumeOptions::default(), FieldTable::default()).await;
-        if consumer.is_err(){
-            println!("its here");
-            let channel=create_channel(Arc::clone(&connection)).await;
-            let objects=sensing_data::Readings::assign_data(50).filter_noise();
-            let packets=Arc::new(Mutex::new((objects.current_state, objects.objects.clone())));
-            let counter=Arc::new(AtomicI32::new(objects.objects_num));
-            sensing(channel.clone(), packets, counter).await;
-            sleep(Duration::from_secs(2)).await;
+        sleep(Duration::from_secs(2)).await;
+        let mut consumer= channel.basic_consume("feedback_data", "sensor", BasicConsumeOptions::default(), FieldTable::default()).await;
+        while consumer.is_err() {
+             println!("Waiting for a message to recieve");
+             consumer= channel.basic_consume("feedback_data", "sensor", BasicConsumeOptions::default(), FieldTable::default()).await;
+             sleep(Duration::from_secs(2)).await;
         }
-        else{
-            println!("not here");
-            let data=handle_feedback(consumer).await;
-            let mut data_vec=vec![];
-            for i in data.clone().into_iter(){
-                data_vec.push((i.1, Readings::TOKEN.to_string(), i.2));
-            }
-            let packets=Arc::new(Mutex::new((data[0].0, data_vec.clone())));
-            let counter=Arc::new(AtomicI32::new(data.len().try_into().unwrap()));
-            sensing(channel.clone(), packets, counter).await;
-            if data_vec.len()==0{
-                return;
-            }
+        let data=handle_feedback(consumer).await;
+        if data.is_empty(){
+            let _=connection.close(200,"terminating gracefully").await;
+            return;
         }
+        let mut data_vec=vec![];
+        for i in data.clone().into_iter(){
+            data_vec.push((i.1, Readings::TOKEN.to_string(), i.2));
+        }
+        let packets=Arc::new(Mutex::new((data[0].0, data_vec.clone())));
+        let counter=Arc::new(AtomicI32::new(data.len().try_into().unwrap()));
+        sensing(channel.clone(), packets, counter).await;
     }
 }

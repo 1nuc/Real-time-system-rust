@@ -90,16 +90,16 @@ async fn process_feedback(pos: f32, temparture: f32, force: f32, vel: f32, id_de
    send_feedback(update_readings, connection).await;
 }
 
-pub async fn create_channel(connection: Arc<Connection>, channel_name: &'static str)-> Channel{
+pub async fn create_channel(connection: Arc<Connection>)-> Channel{
     let channel=connection.create_channel().await.expect("error in creating a channel");
     let _=channel.confirm_select(ConfirmSelectOptions::default()).await;
-    let _=channel.queue_delete("sensing_data", QueueDeleteOptions::default()).await.expect("unable to delete the queue");
-    let _=channel.queue_declare(channel_name,QueueDeclareOptions::default(), FieldTable::default()).await;
+    let _=channel.queue_purge("sensing_data", QueuePurgeOptions::default()).await.expect("unable to delete the queue");
+    let _=channel.queue_declare("feedback_data",QueueDeclareOptions::default(), FieldTable::default()).await;
     channel
 }
 
 async fn handle_transmission(channel: Channel,counter: Arc<AtomicI32>, data: (Actual, Target, i32)){
-    let data_sered=serde_json::to_vec(&(data)
+    let data_sered=serde_json::to_vec(&(ReadingType::RoboticArm(data.0, data.1,data.2))
         ).expect("unable to serialize the data");
     println!("Sendingn feedback data:{:?}", data);
     let confirmation=channel.basic_publish(
@@ -126,43 +126,45 @@ async fn get_confirmation(confirmed: Confirmation)-> String{
     }
 }
 
+#[allow(non_snake_case)]
 pub async fn actuator_control(connection: Arc<Connection>){
-    let channel=create_channel(Arc::clone(&connection), "sensing_data").await;
+    let channel=create_channel(Arc::clone(&connection)).await;
     let mut consumer= channel.basic_consume("sensing_data", "Actuator", BasicConsumeOptions::default(), FieldTable::default()).await;
     while consumer.is_err(){
          println!("Waiting for a message to recieve");
-         consumer= channel.basic_consume("sensing_data", "consumer", BasicConsumeOptions::default(), FieldTable::default()).await;
+         consumer= channel.basic_consume("sensing_data", "actuator", BasicConsumeOptions::default(), FieldTable::default()).await;
          sleep(Duration::from_secs(2)).await;
     }
-    let mut data_vec=vec![];
-
     loop{
-        match timeout(Duration::from_secs(1), consumer.clone().expect("Error retreiving the data").next()).await{
-            Ok(Some(msg))=>{
-                if let Ok(msg)=msg{
-                    let ReadingType::RoboticArm(arm,object,id)=serde_json::from_slice::<ReadingType>(&(msg.data)).expect("Unable to serialize the data");
-                    data_vec.push((arm, object, id));
-                    println!("Message recieved, Arm current position:{:?}, Objcet with ID:{:?}, stats:{:?}",arm, id, object);
-                    let _=msg.acker.ack(BasicAckOptions::default()).await;
-                }
-            },
-            Ok(None) =>{
-                println!("messages have been received");
-                receive(data_vec.clone(), Arc::clone(&connection)).await;
-            },
-            Err(_)=>{
-                println!("Timeout");
-                break;
-            },
-
-
+        let mut data_vec=vec![];
+        loop{
+            match timeout(Duration::from_millis(500), consumer.clone().expect("Error retreiving the data").next()).await{
+                Ok(Some(msg))=>{
+                    if let Ok(msg)=msg{
+                        let ReadingType::RoboticArm(arm,object,id)=serde_json::from_slice::<ReadingType>(&(msg.data)).expect("Unable to serialize the data");
+                        data_vec.push((arm, object, id));
+                        println!("Message recieved, Arm current position:{:?}, Objcet with ID:{:?}, stats:{:?}",arm, id, object);
+                        let _=msg.acker.ack(BasicAckOptions::default()).await;
+                    }
+                },
+                Ok(None) =>{
+                    println!("messages have been received");
+                },
+                Err(_)=>{
+                    println!("waiting for a message from the server");
+                    break;
+                },
+            }
+        }
+        if !data_vec.is_empty(){
+            receive(data_vec.clone(), Arc::clone(&connection)).await;
         }
     }
 }
 
 #[allow(non_snake_case)]
 pub async fn send_feedback(data: SensingType, connection: Arc<Connection>){
-    let channel=create_channel(Arc::clone(&connection), "feedback_data").await;
+    let channel=create_channel(Arc::clone(&connection)).await;
     let packets=Arc::new(Mutex::new(data.clone()));
     let counter=Arc::new(AtomicI32::new(data.len().try_into().unwrap()));
     let counter_cloned=Arc::clone(&counter);
