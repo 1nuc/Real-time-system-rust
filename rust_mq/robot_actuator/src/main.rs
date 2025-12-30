@@ -1,5 +1,4 @@
-use std::sync::Arc;
-use tokio::{*, time::{sleep, timeout}, sync::Mutex};
+use tokio::{*, time::{sleep, timeout}};
 use futures_lite::stream::StreamExt;
 use lapin::{types::FieldTable, *, options::*};
 use serde_json;
@@ -7,42 +6,12 @@ mod actuator;
 use manufacturer::{sensing_data:: *};
 use std::time::Duration;
 
-use crate::actuator::ReadingType;
-async fn create_connection()-> Connection{
-    let addr="amqp://guest:guest@localhost:5672";
-    let mut res=Connection::connect(addr,ConnectionProperties::default()).await;
-    while res.is_err(){
-        println!("Failure in Connecting");
-        res=Connection::connect(addr,ConnectionProperties::default()).await;
-        sleep(Duration::from_secs(1)).await;
-    }
-    println!("Successful connection");
-    let connection= res.unwrap();
-    connection
-    
-}
-async fn receive(data_vec: Vec<(Actual, Target, i32)>){
-    let (arm, object, id)=find_smallest(data_vec.clone());
-    let handle=task::spawn(async move {
-        println!("Processing the Nearset Object with ID:{:?}", id );
-        actuator::process_singals(data_vec, arm, object, id,).await;
-    });
-    handle.await.unwrap();
-}
 
-fn find_smallest(vector: Vec<(Actual, Target, i32)>)-> (Actual, Target, i32){
-    let extracted_vals: Vec<_>=vector.clone().into_iter().map(|x|{
-        let y=x.0.position.abs() -x.1.position.abs();
-        (y, x.2)
-    }).collect();
-    let smallest_val=extracted_vals.into_iter().min_by(|a,b|a.0.partial_cmp(&b.0).unwrap()).unwrap();
-    let mut filtered_vec: Vec<(Actual, Target, i32)>=vector.into_iter().filter(|x| x.2 ==smallest_val.1).collect();
-    filtered_vec.pop().unwrap()
-}
 #[allow(unused_variables)]
+#[allow(non_snake_case)]
 #[tokio::main]
 async fn main() {
-    let connection=create_connection().await;
+    let connection =actuator::create_connection().await;
     let channel=connection.create_channel().await.expect("error in creating a channel");
     let queue_options=QueueDeclareOptions{
         passive: false,
@@ -79,7 +48,7 @@ async fn main() {
 
         }
     }
-    receive(data_vec).await;
+    actuator::receive(data_vec, connection).await;
 // there should be a function to calculate the nearset position
 // this function should receive everything all at once pick the nearset object from the arm hold
 // it and send back the remaining objcets
