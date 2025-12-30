@@ -1,16 +1,15 @@
 use tokio::*;
-use lapin::Connection;
+use std::sync::Arc;
 mod sensor;
 
 #[allow(unused_variables)]
 #[allow(non_snake_case)]
 #[tokio::main]
 async fn main() {
-    
-    
-    let connection: Connection= sensor::create_connection().await;
+    let connection= Arc::new(sensor::create_connection().await);
     //create a communication channel
-    let channel=sensor::create_channel(connection).await;
-    sensor::sensor_control(channel).await;
+    let connection_cloned=Arc::clone(&connection);
+    let channel=sensor::create_channel(connection_cloned).await;
+    sensor::sensor_control(channel, connection).await;
     signal::ctrl_c().await.expect("failed");
 }

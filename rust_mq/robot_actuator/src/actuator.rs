@@ -93,7 +93,7 @@ async fn process_feedback(pos: f32, temparture: f32, force: f32, vel: f32, id_de
 pub async fn create_channel(connection: Arc<Connection>, channel_name: &'static str)-> Channel{
     let channel=connection.create_channel().await.expect("error in creating a channel");
     let _=channel.confirm_select(ConfirmSelectOptions::default()).await;
-    let _=channel.queue_delete(channel_name, QueueDeleteOptions::default()).await.expect("unable to delete the queue");
+    let _=channel.queue_delete("sensing_data", QueueDeleteOptions::default()).await.expect("unable to delete the queue");
     let _=channel.queue_declare(channel_name,QueueDeclareOptions::default(), FieldTable::default()).await;
     channel
 }
@@ -137,7 +137,7 @@ pub async fn actuator_control(connection: Arc<Connection>){
     let mut data_vec=vec![];
 
     loop{
-        match timeout(Duration::from_secs(2), consumer.clone().expect("Error retreiving the data").next()).await{
+        match timeout(Duration::from_secs(1), consumer.clone().expect("Error retreiving the data").next()).await{
             Ok(Some(msg))=>{
                 if let Ok(msg)=msg{
                     let ReadingType::RoboticArm(arm,object,id)=serde_json::from_slice::<ReadingType>(&(msg.data)).expect("Unable to serialize the data");
