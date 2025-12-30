@@ -21,6 +21,15 @@ async fn create_connection()-> Connection{
     connection
     
 }
+async fn receive(data_vec: Vec<(Actual, Target, i32)>){
+    let (arm, object, id)=find_smallest(data_vec.clone());
+    let handle=task::spawn(async move {
+        println!("Processing the Nearset Object with ID:{:?}", id );
+        actuator::process_singals(data_vec, arm, object, id,).await;
+    });
+    handle.await.unwrap();
+}
+
 fn find_smallest(vector: Vec<(Actual, Target, i32)>)-> (Actual, Target, i32){
     let extracted_vals: Vec<_>=vector.clone().into_iter().map(|x|{
         let y=x.0.position.abs() -x.1.position.abs();
@@ -70,11 +79,7 @@ async fn main() {
 
         }
     }
-    task::spawn(async move {
-                task::yield_now().await;
-                println!("{:?}", consumer.state());
-                actuator::process_singals(data_vec, arm, object, id,).await;
-    });
+    receive(data_vec).await;
 // there should be a function to calculate the nearset position
 // this function should receive everything all at once pick the nearset object from the arm hold
 // it and send back the remaining objcets
