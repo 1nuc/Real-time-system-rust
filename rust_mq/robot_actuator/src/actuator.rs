@@ -1,4 +1,5 @@
-use tokio::{sync::Mutex, *, time::sleep};
+use tokio::{sync::Mutex, *, time::{sleep, timeout}};
+use futures_lite::stream::StreamExt;
 use manufacturer::{Initiation, PIDSetup, actuator_data::PID, sensing_data::{Actual,Target}};
 use serde::{Serialize, Deserialize};
 use std::sync::{Arc, atomic::{AtomicI32, Ordering}};
@@ -24,7 +25,7 @@ pub async fn create_connection()-> Connection{
     connection
     
 }
-pub async fn receive(data_vec: Vec<(Actual, Target, i32)>, connection: Connection){
+pub async fn receive(data_vec: Vec<(Actual, Target, i32)>, connection: Arc<Connection>){
     let (arm, object, id)=find_smallest(data_vec.clone());
     let handle=task::spawn(async move {
         println!("Processing the Nearset Object with ID:{:?}", id );
@@ -46,7 +47,7 @@ fn find_smallest(vector: Vec<(Actual, Target, i32)>)-> (Actual, Target, i32){
 // //TODO: Add another function to update the indices without the need for the object data to be
 // //available
 pub async fn process_singals(robotic_data: SensingType,mut current_arm_status: Actual, mut object_status: Target,
-    id: i32, connection: Connection){
+    id: i32, connection: Arc<Connection>){
 //TODO: processing Position
     let position=task::spawn(async move{
         PID::calculate_pid(&mut current_arm_status.position,&mut object_status.position, "Position")
@@ -77,25 +78,30 @@ fn update_values(object_id: i32, arm_status: Actual, objects: SensingType) -> Se
 }
 
 async fn process_feedback(pos: f32, temparture: f32, force: f32, vel: f32, id_deleted: i32,
-    robotic_data: SensingType, connection: Connection) {
+    robotic_data: SensingType, connection: Arc<Connection>) {
    let updated_arm_status=Actual::init(temparture, force, vel, pos);
    println!("Object with ID: {:?} is lifted", id_deleted);
    println!("Updated Arm stats: {:?}", updated_arm_status);
+   if robotic_data.len()==0{
+       connection.close(200, "Tasks Done").await.unwrap();
+       return;
+   }
    let update_readings=update_values(id_deleted, updated_arm_status, robotic_data);
    send_feedback(update_readings, connection).await;
 }
 
-pub async fn create_channel(connection: Connection)-> Channel{
+pub async fn create_channel(connection: Arc<Connection>, channel_name: &'static str)-> Channel{
     let channel=connection.create_channel().await.expect("error in creating a channel");
     let _=channel.confirm_select(ConfirmSelectOptions::default()).await;
-    let _=channel.queue_declare("feedback_data",QueueDeclareOptions::default(), FieldTable::default()).await;
+    let _=channel.queue_delete(channel_name, QueueDeleteOptions::default()).await.expect("unable to delete the queue");
+    let _=channel.queue_declare(channel_name,QueueDeclareOptions::default(), FieldTable::default()).await;
     channel
 }
 
 async fn handle_transmission(channel: Channel,counter: Arc<AtomicI32>, data: (Actual, Target, i32)){
     let data_sered=serde_json::to_vec(&(data)
         ).expect("unable to serialize the data");
-    println!("sending robotic data");
+    println!("Sendingn feedback data:{:?}", data);
     let confirmation=channel.basic_publish(
         "", "feedback_data",
         BasicPublishOptions::default(),
@@ -120,9 +126,43 @@ async fn get_confirmation(confirmed: Confirmation)-> String{
     }
 }
 
+pub async fn actuator_control(connection: Arc<Connection>){
+    let channel=create_channel(Arc::clone(&connection), "sensing_data").await;
+    let mut consumer= channel.basic_consume("sensing_data", "Actuator", BasicConsumeOptions::default(), FieldTable::default()).await;
+    while consumer.is_err(){
+         println!("Waiting for a message to recieve");
+         consumer= channel.basic_consume("sensing_data", "consumer", BasicConsumeOptions::default(), FieldTable::default()).await;
+         sleep(Duration::from_secs(2)).await;
+    }
+    let mut data_vec=vec![];
+
+    loop{
+        match timeout(Duration::from_secs(2), consumer.clone().expect("Error retreiving the data").next()).await{
+            Ok(Some(msg))=>{
+                if let Ok(msg)=msg{
+                    let ReadingType::RoboticArm(arm,object,id)=serde_json::from_slice::<ReadingType>(&(msg.data)).expect("Unable to serialize the data");
+                    data_vec.push((arm, object, id));
+                    println!("Message recieved, Arm current position:{:?}, Objcet with ID:{:?}, stats:{:?}",arm, id, object);
+                    let _=msg.acker.ack(BasicAckOptions::default()).await;
+                }
+            },
+            Ok(None) =>{
+                println!("messages have been received");
+                receive(data_vec.clone(), Arc::clone(&connection)).await;
+            },
+            Err(_)=>{
+                println!("Timeout");
+                break;
+            },
+
+
+        }
+    }
+}
+
 #[allow(non_snake_case)]
-pub async fn send_feedback(data: SensingType, connection: Connection){
-    let channel=create_channel(connection).await;
+pub async fn send_feedback(data: SensingType, connection: Arc<Connection>){
+    let channel=create_channel(Arc::clone(&connection), "feedback_data").await;
     let packets=Arc::new(Mutex::new(data.clone()));
     let counter=Arc::new(AtomicI32::new(data.len().try_into().unwrap()));
     let counter_cloned=Arc::clone(&counter);

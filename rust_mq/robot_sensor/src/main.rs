@@ -11,6 +11,6 @@ async fn main() {
     let connection: Connection= sensor::create_connection().await;
     //create a communication channel
     let channel=sensor::create_channel(connection).await;
-    sensor::send(channel).await;
+    sensor::sensor_control(channel).await;
     signal::ctrl_c().await.expect("failed");
 }

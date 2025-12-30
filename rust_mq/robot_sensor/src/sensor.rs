@@ -1,5 +1,6 @@
 use lapin::{options::*, publisher_confirm::Confirmation, types::FieldTable, *};
-use tokio::{time::sleep, *, sync::Mutex};
+use futures_lite::stream::StreamExt;
+use tokio::{time::{sleep, timeout}, *, sync::Mutex};
 use std::{sync::{Arc,atomic::{AtomicI32, Ordering}},time::Duration};
 use manufacturer::{sensing_data::{Actual, Target}, *};
 use serde_json::{self};
@@ -58,28 +59,54 @@ async fn handle_transmission(channel: Channel,counter: Arc<AtomicI32>, arm_data:
     counter.fetch_sub(1,Ordering::Release);
 }
 
-pub async fn send(channel: Channel){
-    let objects=sensing_data::Readings::assign_data(50).filter_noise();
-    let packets=Arc::new(Mutex::new((objects.current_state, objects.objects.clone())));
-    let counter=Arc::new(AtomicI32::new(objects.objects_num));
-    let counter_cloned=Arc::clone(&counter);
-    let value= counter_cloned.load(Ordering::Acquire);
-    println!("Sending:{:?} objects", value);
-    for _ in 0..value{
-        let channel_cloned=channel.clone();
-        let counter_cloned=Arc::clone(&counter);
-        let packets_cloned=Arc::clone(&packets);
-        task::spawn(async move{
-            let mut data=packets_cloned.lock().await;
-            match data.1.pop(){
-                Some(val)=>{
-                    handle_transmission(channel_cloned, counter_cloned, data.0, val.0, val.2).await;
-                },
-                None =>{
-                    println!("All boxes have been sent");
-                    drop(data);
+async fn handle_feedback(consumer: Result<Consumer>){
+    let mut data_vec=vec![];
+    loop{
+        match timeout(Duration::from_secs(1), consumer.clone().expect("Error retreiving the data").next()).await{
+            Ok(Some(msg))=>{
+                if let Ok(msg)=msg{
+                    let ReadingType::RoboticArm(arm,object,id)=serde_json::from_slice::<ReadingType>(&(msg.data)).expect("Unable to serialize the data");
+                    data_vec.push((arm, object, id));
+                    println!("Message recieved, Arm current position:{:?}, Objcet with ID:{:?}, stats:{:?}",arm, id, object);
+                    let _=msg.acker.ack(BasicAckOptions::default()).await;
                 }
-            }
-        });
+            },
+            Ok(None) =>{
+                println!("messages have been received");
+                receive(data_vec.clone(), Arc::clone(&connection)).await;
+            },
+            Err(_)=>{
+                println!("Timeout");
+                break;
+            },
+        }
+    }
+}
+pub async fn sensor_control(channel: Channel){
+    let mut consumer= channel.basic_consume("feedback_data", "Actuator", BasicConsumeOptions::default(), FieldTable::default()).await;
+    if consumer.is_err(){
+        let objects=sensing_data::Readings::assign_data(50).filter_noise();
+        let packets=Arc::new(Mutex::new((objects.current_state, objects.objects.clone())));
+        let counter=Arc::new(AtomicI32::new(objects.objects_num));
+        let counter_cloned=Arc::clone(&counter);
+        let value= counter_cloned.load(Ordering::Acquire);
+        println!("Sending:{:?} objects", value);
+        for _ in 0..value{
+            let channel_cloned=channel.clone();
+            let counter_cloned=Arc::clone(&counter);
+            let packets_cloned=Arc::clone(&packets);
+            task::spawn(async move{
+                let mut data=packets_cloned.lock().await;
+                match data.1.pop(){
+                    Some(val)=>{
+                        handle_transmission(channel_cloned, counter_cloned, data.0, val.0, val.2).await;
+                    },
+                    None =>{
+                        println!("All boxes have been sent");
+                        drop(data);
+                    }
+                }
+            });
+        }
     }
 }
