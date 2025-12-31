@@ -1,4 +1,4 @@
-use crate::sensing_data::{Actual, Target};
+use crate::sensing_data::{Actual};
 
 pub mod sensing_data;
 pub mod actuator_data;

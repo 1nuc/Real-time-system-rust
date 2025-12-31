@@ -1,8 +1,8 @@
-use crate::{Sensing, sensor::{self, ReadingType}, transmission_control::TransmissionChannel};
+use crate::{Sensing, sensor::{ReadingType}, transmission_control::TransmissionChannel};
 use crate::{Actuator, Shared, Control};
 use crossbeam::channel::*;
 use std::{
-    thread, time::Duration, sync::{
+    thread,sync::{
         Arc, Mutex, MutexGuard, atomic::{
             AtomicI32, Ordering}}};
 
