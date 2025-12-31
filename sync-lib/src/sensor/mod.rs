@@ -4,7 +4,7 @@ use std::{
 use crossbeam::{channel::*};
 use manufacturer::{sensing_data::{Actual, Target, Readings}};
 
-use crate::{Control, Sensing, Shared, transmission_control::{TransmissionChannel}};
+use crate::{ControlSync, SensingSync, Shared, transmission_control::{TransmissionChannel}};
 
 #[derive(Clone, Copy, Debug)]
 pub enum ReadingType{
@@ -16,7 +16,7 @@ impl Shared for Readings{
     type Type= Arc<Mutex<(Actual,Vec<(Target,String, i32)>)>>;
 }
 #[allow(non_snake_case)]
-impl Sensing for Readings{
+impl SensingSync for Readings{
     fn sensor_control(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>,feedback_recv: Receiver<ReadingType>, counts: Arc<AtomicI32>) {
         if feedback_recv.is_empty(){
             self.collect_data(sensing_info ,sensor_send, counts);

@@ -2,7 +2,7 @@ use std::{time::{Duration, Instant},sync::{
     Arc, Mutex,MutexGuard, atomic::{AtomicI32, Ordering}}, 
 };
 use manufacturer::{Actions,sensing_data::Readings, actuator_data::PID};
-use crate::{Actuator, Shared,Target, Actual, Control, Sensing, sensor::{ReadingType}};
+use crate::{ActuatorSync, Shared,Target, Actual, ControlSync, SensingSync, sensor::{ReadingType}};
 use crossbeam::channel::*;
 pub struct TransmissionChannel{
     pub txes: Sender<ReadingType>,
@@ -16,7 +16,7 @@ impl Shared for TransmissionChannel{
 
 #[allow(non_snake_case)]
 #[allow(unused_variables)]
-impl Control for TransmissionChannel{
+impl ControlSync for TransmissionChannel{
     fn init()-> Self{
         let (tx, rx) = unbounded::<ReadingType>();
         Self{

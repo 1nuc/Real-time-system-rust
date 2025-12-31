@@ -1,5 +1,5 @@
-use crate::{Sensing, sensor::{ReadingType}, transmission_control::TransmissionChannel};
-use crate::{Actuator, Shared, Control};
+use crate::{SensingSync, sensor::{ReadingType}, transmission_control::TransmissionChannel};
+use crate::{ActuatorSync, Shared, ControlSync};
 use crossbeam::channel::*;
 use std::{
     thread,sync::{
@@ -15,7 +15,7 @@ impl Shared for PID{
     type SharedLock<'a>=MutexGuard<'a, (Actual,Vec<(Target,String, i32)>)>;
 }
 #[allow(non_snake_case)]
-impl<'a> Actuator<'a> for PID{
+impl<'a> ActuatorSync<'a> for PID{
     fn actuator_control(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>,
         counts: Arc<AtomicI32>, feedback_send: Sender<ReadingType>, robotic_data: Readings) {
             if !sensor_recv.is_empty(){

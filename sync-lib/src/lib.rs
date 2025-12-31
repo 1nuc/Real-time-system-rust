@@ -10,18 +10,18 @@ pub trait Shared{
     type SharedLock<'a>;
     type Type;
 }
-pub trait Actuator <'a>: Shared{
+pub trait ActuatorSync <'a>: Shared{
     fn actuator_control(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>, counts: Arc<AtomicI32>, feedback_send: Sender<ReadingType>, robotic_data: Readings);
     fn process_singals(lock: Self::SharedLock<'a>, current_arm_status: Actual,
         object_status: Target, id: i32, feedback_send: Sender<ReadingType>, robotic_data: Readings, counts: Arc<AtomicI32>);
     fn process_feedback(pos: f32, temparture: f32, force: f32, vel: f32, id: i32, robotic_data: Readings, feedback_send: Sender<ReadingType>, counts: Arc<AtomicI32>);
 }
-pub trait Sensing: Shared{
+pub trait SensingSync: Shared{
     fn collect_data(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>, counts: Arc<AtomicI32>);
     fn sensor_control(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>, feedback_recv: Receiver<ReadingType>, counts: Arc<AtomicI32>);
     fn sensor_workflow(packets: Self::Type, tx_copy: Sender<ReadingType>);
 }
-pub trait Control: Shared{
+pub trait ControlSync: Shared{
     fn init()-> Self;
     fn simulation_control(self, boxes_num: i32);
     fn transmit_data<'a>(data: ReadingType, sensor_send: Sender<ReadingType>, lock: Self::SharedLock<'a>);

@@ -4,7 +4,7 @@ use sync_lib::*;
 // #[tokio::main]
 fn main() {
         let simulation=transmission_control::TransmissionChannel::init();
-        simulation.simulation_control();
+        simulation.simulation_control(32);
     // let simulation=transmission_control::TransmissionChannel::init();
     // simulation.simulation_control().await;
     
