@@ -3,7 +3,7 @@ use futures_lite::stream::StreamExt;
 use manufacturer::{Initiation, PIDSetup, actuator_data::PID, sensing_data::{Actual,Target}};
 use serde::{Serialize, Deserialize};
 use std::sync::{Arc, atomic::{AtomicI32, Ordering}};
-use lapin::{BasicProperties, Channel, Connection, ConnectionProperties, options::*, publisher_confirm::Confirmation, types::FieldTable};
+use lapin::{BasicProperties, Channel, Connection, ConnectionProperties, ConnectionState, options::*, publisher_confirm::Confirmation, types::FieldTable};
 use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -82,7 +82,7 @@ async fn process_feedback(pos: f32, temparture: f32, force: f32, vel: f32, id_de
    let updated_arm_status=Actual::init(temparture, force, vel, pos);
    println!("Object with ID: {:?} is lifted", id_deleted);
    println!("Updated Arm stats: {:?}", updated_arm_status);
-   if robotic_data.len()==0{
+   if robotic_data.len()==1{
        connection.close(200, "Tasks Done").await.unwrap();
        return;
    }
@@ -101,7 +101,7 @@ pub async fn create_channel(connection: Arc<Connection>)-> Channel{
 async fn handle_transmission(channel: Channel,counter: Arc<AtomicI32>, data: (Actual, Target, i32)){
     let data_sered=serde_json::to_vec(&(ReadingType::RoboticArm(data.0, data.1,data.2))
         ).expect("unable to serialize the data");
-    println!("Sendingn feedback data:{:?}", data);
+    println!("Sendingn feedback data");
     let confirmation=channel.basic_publish(
         "", "feedback_data",
         BasicPublishOptions::default(),
@@ -136,9 +136,13 @@ pub async fn actuator_control(connection: Arc<Connection>){
          sleep(Duration::from_secs(2)).await;
     }
     loop{
+        if connection.status().state()!=ConnectionState::Connected{
+            println!("All objects have been lifted. sensor is closing...");
+            return;
+        }
         let mut data_vec=vec![];
         loop{
-            match timeout(Duration::from_millis(500), consumer.clone().expect("Error retreiving the data").next()).await{
+            match timeout(Duration::from_millis(200), consumer.clone().expect("Error retreiving the data").next()).await{
                 Ok(Some(msg))=>{
                     if let Ok(msg)=msg{
                         let ReadingType::RoboticArm(arm,object,id)=serde_json::from_slice::<ReadingType>(&(msg.data)).expect("Unable to serialize the data");
@@ -151,6 +155,7 @@ pub async fn actuator_control(connection: Arc<Connection>){
                     println!("messages have been received");
                 },
                 Err(_)=>{
+                    println!("Connection:{:?} ", connection.status().state());
                     println!("waiting for a message from the server");
                     break;
                 },

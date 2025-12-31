@@ -1,4 +1,4 @@
-use tokio::*;
+// use tokio::*;
 use std::sync::Arc;
 mod sensor;
 
@@ -11,5 +11,5 @@ async fn main() {
     let connection_cloned=Arc::clone(&connection);
     let channel=sensor::create_channel(connection).await;
     sensor::sensor_control(channel, connection_cloned).await;
-    signal::ctrl_c().await.expect("failed");
+    // signal::ctrl_c().await.expect("failed");
 }

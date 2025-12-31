@@ -64,7 +64,7 @@ async fn handle_transmission(channel: Channel,counter: Arc<AtomicI32>, arm_data:
 async fn handle_feedback(consumer: Result<Consumer>)-> Vec<(Actual, Target,i32)>{
     let mut data_vec=vec![];
     loop{
-        match timeout(Duration::from_millis(500), consumer.clone().expect("Error retreiving the data").next()).await{
+        match timeout(Duration::from_millis(200), consumer.clone().expect("Error retreiving the data").next()).await{
             Ok(Some(msg))=>{
                 if let Ok(msg)=msg{
                     let ReadingType::RoboticArm(arm,object,id)=serde_json::from_slice::<ReadingType>(&(msg.data)).expect("Unable to serialize the data");
@@ -78,7 +78,7 @@ async fn handle_feedback(consumer: Result<Consumer>)-> Vec<(Actual, Target,i32)>
                 break;
             },
             Err(_)=>{
-                println!("Timeout");
+                println!("waiting for a feedback from the sensor");
                 break;
             },
         }
@@ -86,15 +86,16 @@ async fn handle_feedback(consumer: Result<Consumer>)-> Vec<(Actual, Target,i32)>
     data_vec
 }
 #[allow(non_snake_case)]
-pub async fn sensing(channel: Channel, data: Arc<Mutex<(Actual, Vec<(Target, String,i32)>)>>, counter: Arc<AtomicI32>){
+pub async fn sensing(channel: Channel, data: Arc<Mutex<(Actual, Vec<(Target, String,i32)>)>>, counter: Arc<AtomicI32>, connection: Arc<Connection>){
     let counter_cloned=Arc::clone(&counter);
     let value= counter_cloned.load(Ordering::Acquire);
     println!("Sending:{:?} objects", value);
+    let mut handler=vec![];
     for _ in 0..value{
         let channel_cloned=channel.clone();
         let counter_cloned=Arc::clone(&counter);
         let packets_cloned=Arc::clone(&data);
-        task::spawn(async move{
+        let handle=task::spawn(async move{
             let mut data=packets_cloned.lock().await;
             match data.1.pop(){
                 Some(val)=>{
@@ -106,6 +107,13 @@ pub async fn sensing(channel: Channel, data: Arc<Mutex<(Actual, Vec<(Target, Str
                 }
             }
         });
+        handler.push(handle);
+    }
+    for handle in handler{
+        handle.await.unwrap();
+    }
+    if value==1{
+        let _=connection.close(200,"terminating gracefully").await;
     }
 }
 
@@ -113,20 +121,23 @@ pub async fn sensor_control(channel: Channel, connection: Arc<Connection>){
     let objects=sensing_data::Readings::assign_data(50).filter_noise();
     let packets=Arc::new(Mutex::new((objects.current_state, objects.objects.clone())));
     let counter=Arc::new(AtomicI32::new(objects.objects_num));
-    sensing(channel, packets, counter).await;
+    sensing(channel, packets, counter, Arc::clone(&connection)).await;
     let channel=create_channel(Arc::clone(&connection)).await;
     loop{
-        sleep(Duration::from_secs(2)).await;
+        sleep(Duration::from_secs(1)).await;
+        if connection.status().state()!=ConnectionState::Connected{
+            println!("All objects have been sent..server is closing");
+            return;
+        }
         let mut consumer= channel.basic_consume("feedback_data", "sensor", BasicConsumeOptions::default(), FieldTable::default()).await;
         while consumer.is_err() {
              println!("Waiting for a message to recieve");
              consumer= channel.basic_consume("feedback_data", "sensor", BasicConsumeOptions::default(), FieldTable::default()).await;
-             sleep(Duration::from_secs(2)).await;
+             sleep(Duration::from_secs(1)).await;
         }
         let data=handle_feedback(consumer).await;
         if data.is_empty(){
-            let _=connection.close(200,"terminating gracefully").await;
-            return;
+            continue;
         }
         let mut data_vec=vec![];
         for i in data.clone().into_iter(){
@@ -134,6 +145,6 @@ pub async fn sensor_control(channel: Channel, connection: Arc<Connection>){
         }
         let packets=Arc::new(Mutex::new((data[0].0, data_vec.clone())));
         let counter=Arc::new(AtomicI32::new(data.len().try_into().unwrap()));
-        sensing(channel.clone(), packets, counter).await;
+        sensing(channel.clone(), packets, counter, connection.clone()).await;
     }
 }

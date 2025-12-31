@@ -1,4 +1,4 @@
-use tokio::*;
+// use tokio::*;
 mod actuator;
 use std::sync::Arc;
 
@@ -11,6 +11,4 @@ async fn main() {
 
     let connection_cloned=Arc::clone(&connection);
     actuator::actuator_control(connection_cloned).await;
-
-    signal::ctrl_c().await.expect("unable to terminate");
 }
