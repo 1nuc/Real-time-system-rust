@@ -72,8 +72,8 @@ impl Control for TransmissionChannel{
         drop(feedback_recv);
     }
 
-    async fn simulation_control(self){
-        let robotic_data=Readings::assign_data(30).filter_noise();
+    async fn simulation_control(self, boxes_num: i32){
+        let robotic_data=Readings::assign_data(boxes_num).filter_noise();
         let sensing_info= Arc::new(Mutex::new((robotic_data.current_state, robotic_data.objects.clone())));
         println!("objects :{}", robotic_data.objects_num);
         let feedback_channel=Self::init();
