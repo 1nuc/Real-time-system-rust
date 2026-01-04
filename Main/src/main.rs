@@ -1,12 +1,12 @@
 use sync_lib::*;
 // use async_lib::*;
-// use tokio;
+// use tokioo;
 // #[tokio::main]
 fn main() {
         let simulation=transmission_control::TransmissionChannel::init();
         simulation.simulation_control(32);
-    // let simulation=transmission_control::TransmissionChannel::init();
-    // simulation.simulation_control().await;
+        // let simulation=transmission_control::TransmissionChannel::init();
+        // simulation.simulation_control(30).await;
     
 }
 

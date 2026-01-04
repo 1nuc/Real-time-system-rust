@@ -21,25 +21,21 @@ impl<'a> Actuator<'a> for PID{
     async fn actuator_control(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>,
         counts: Arc<AtomicI32>, feedback_send: Sender<ReadingType>, robotic_data: Readings) {
         if !sensor_recv.is_empty(){
-            let value=counts.load(Ordering::Acquire);
-            for _ in 0..value{
-                let receiver_lock=Arc::clone(&sensing_info);
-                let sensor_recv_cloned=sensor_recv.clone();
-                let feedback_send_cloned=feedback_send.clone();
-                let robotic_data_cloned=robotic_data.clone();
-                task::spawn(async move{
-                    match TransmissionChannel::recieve_transmission(sensor_recv_cloned).await{
-                        Some(val)=>{
-                            let lock=receiver_lock.lock().await;
-                            let ReadingType::RoboticArm(arm, object, id)=val;
-                            println!("object Id: {:?} Received", id);
-                            Self::process_singals(lock, arm, object, id, feedback_send_cloned, robotic_data_cloned, counts).await;
-                        },
-                        None => (),
-                    } 
-                });
-                return;
-            }
+            let receiver_lock=Arc::clone(&sensing_info);
+            let sensor_recv_cloned=sensor_recv.clone();
+            let feedback_send_cloned=feedback_send.clone();
+            let robotic_data_cloned=robotic_data.clone();
+            task::spawn(async move{
+                match TransmissionChannel::recieve_transmission(sensor_recv_cloned).await{
+                    Some(val)=>{
+                        let lock=receiver_lock.lock().await;
+                        let ReadingType::RoboticArm(arm, object, id)=val;
+                        println!("object Id: {:?} Received", id);
+                        Self::process_singals(lock, arm, object, id, feedback_send_cloned, robotic_data_cloned, counts).await;
+                    },
+                    None => (),
+                } 
+            }).await.unwrap();
         }
     }
 
