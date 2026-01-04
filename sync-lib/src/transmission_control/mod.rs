@@ -33,9 +33,7 @@ impl ControlSync for TransmissionChannel{
           }, 
           Err(_) =>{
               "error while sending, thread run into fail safe mode...";
-              //TODO: Implementing fault tolerance mechanism Options:
-              //1. Checkpoints
-              //2. more concrete fail safe mode function 
+              return
           }
        } 
     }
@@ -50,7 +48,6 @@ impl ControlSync for TransmissionChannel{
                 Err(e)=> {
                    println!("Error in recieving the data: {e}");
                    None 
-                    //TODO: Some logic should be made to avoid channel collapse
                 },
             }
     }
@@ -63,7 +60,10 @@ impl ControlSync for TransmissionChannel{
                 data.push((remaining_objects,token, id));
                 drop(data);
             },
-            Err(RecvTimeoutError)=> println!("time out for that thread"),
+            Err(RecvTimeoutError)=>{
+                 println!("deadline passed for thread..recovery mode is On");
+                 return
+            }
         }
     }
 
