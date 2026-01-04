@@ -4,7 +4,7 @@ use sync_lib::{ControlSync, SensingSync,transmission_control};
 use std::sync::{Mutex, atomic::AtomicI32, Arc};
 fn measure_generation(c: &mut Criterion){
     let mut group= c.benchmark_group("Readings Generation Measurement");
-    let scale=vec![10, 20, 30, 40, 50, 100];
+    let scale=vec![10, 30, 50, 100];
     for size in scale.into_iter(){
         group.bench_function(format!("Readings generation, {:?} size",size), move |x|{
             x.iter(||{
@@ -17,7 +17,7 @@ fn measure_generation(c: &mut Criterion){
 
 fn measure_processing(c: &mut Criterion){
     let mut group= c.benchmark_group("Readings Processing");
-    let scale=vec![10, 20, 30, 40, 50, 100];
+    let scale=vec![10, 30, 50, 100];
     for size in scale.into_iter(){
         group.bench_function(format!("Readings Processing, {:?} size",size), move |x|{
             x.iter(||{
@@ -38,7 +38,7 @@ fn execute_tramission(size : i32){
 
 fn data_transmission(c: &mut Criterion){
     let mut group= c.benchmark_group("Data Transmission");
-    let scale=vec![10, 20, 30, 40, 50, 100];
+    let scale=vec![10, 30, 50, 100];
     for size in scale.into_iter(){
         group.bench_function(format!("data transmission, {:?} size",size), move |x|{
             x.iter(||{
