@@ -44,25 +44,24 @@ impl<'a> Actuator<'a> for PID{
 //TODO: processing Position
         let position=timeout(Duration::from_millis(1),task::spawn(async move{
             PID::calculate_pid(&mut current_arm_status.position,&mut object_status.position, "Position")
-        }));
+        })).await.unwrap();
 //TODO: processing Temparture
         let temparture=timeout(Duration::from_millis(1),task::spawn(async move{
             PID::calculate_pid(&mut current_arm_status.temperature,&mut object_status.temperature, "Temprature")
-        }));
+        })).await.unwrap();
 // //TODO: processing Force
         let force=timeout(Duration::from_millis(1),task::spawn(async move{
             PID::calculate_pid(&mut current_arm_status.force,&mut object_status.force,  "Force")
-        }));
+        })).await.unwrap();
 //TODO: processing Velocity
         let velocity=timeout(Duration::from_millis(1),task::spawn(async move{
             PID::calculate_pid(&mut current_arm_status.velocity,&mut object_status.velocity,  "Velocity")
-        }));
+        })).await.unwrap();
         match try_join!(position, temparture, force, velocity){
             Ok(val)=>{
-                println!("deadline is satisfied");
-                Self::process_feedback(val.0.unwrap(), val.1.unwrap(), val.2.unwrap(), val.3.unwrap(), id, robotic_data,feedback_send, counts).await; 
+                Self::process_feedback(position, temparture, force, velocity, id, robotic_data,feedback_send, counts).await; 
             },
-            Err(_err)=>{
+            Err(err)=>{
                 println!("time constraint was brocken.. entering safe mode");
                 return;
             }

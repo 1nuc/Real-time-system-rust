@@ -27,7 +27,7 @@ impl Sensing for Readings{
         else{
             match timeout(Duration::from_millis(5), self.handle_feedback(sensing_info, sensor_send, feedback_recv, counts)).await{
                 Ok(ok)=> println!("Feedback is sent in the allocated time"),
-                Err(err) => println!("Error timeout for the feedback to be sent"),
+                Err(err) => println!("Error timeout for the feedback to be sent.. entering fail safe mode .."),
             }
         }
     }
