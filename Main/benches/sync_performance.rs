@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use manufacturer::{Actions, sensing_data::Readings};
-use sync_lib::{ControlSync, SensingSync, sensor, transmission_control};
-use std::sync::{Mutex, AtomicI32, Arc};
+use sync_lib::{ControlSync, SensingSync,transmission_control};
+use std::sync::{Mutex, atomic::AtomicI32, Arc};
 fn measure_generation(c: &mut Criterion){
     let mut group= c.benchmark_group("Readings Generation Measurement");
     let scale=vec![10, 20, 30, 40, 50, 100];
