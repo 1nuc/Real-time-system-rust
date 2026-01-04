@@ -22,6 +22,7 @@ pub trait Actuator <'a>: Shared{
 pub trait Sensing: Shared{
     async fn collect_data(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>, counts: Arc<AtomicI32>);
     async fn sensor_control(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>, feedback_recv: Receiver<ReadingType>, counts: Arc<AtomicI32>);
+    async fn handle_feedback(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>, feedback_recv: Receiver<ReadingType>, counts: Arc<AtomicI32>);
     async fn sensor_workflow(packets: Self::Type, tx_copy: Sender<ReadingType>);
 }
 #[trait_variant::make(Send)]

@@ -3,7 +3,7 @@ use std::{
 
 use flume::*;
 use tokio::{task, sync::{
-    MutexGuard, Mutex}, time::Instant 
+    MutexGuard, Mutex}, time::{Instant, timeout, Duration} 
 };
 use manufacturer::{sensing_data::{Actual, Target, Readings}};
 
@@ -25,36 +25,43 @@ impl Sensing for Readings{
             self.collect_data(sensing_info ,sensor_send, counts).await;
         }
         else{
-            let now=Instant::now();
-            let mut objects=Arc::new(Mutex::new(Vec::new()));
-            let mut arm_status=Arc::new(self.current_state);
-            let value=counts.load(Ordering::Acquire);
-            let mut handler=vec![];
-            for i in 0..value{
-                let object_copy=Arc::clone(&mut objects);
-                let feedback_recv_cloned=feedback_recv.clone();
-                let arm_status_cloned=Arc::clone(&mut arm_status);
-                let handle=task::spawn(async move{
-                    let lock=object_copy.lock().await;
-                    TransmissionChannel::recieve_transmission_deadline(now.into(), lock, arm_status_cloned, feedback_recv_cloned).await;
-                    //TODO: Add timeout function
-                });
-                handler.push(handle);
+            match timeout(Duration::from_millis(5), self.handle_feedback(sensing_info, sensor_send, feedback_recv, counts)).await{
+                Ok(ok)=> println!("Feedback is sent in the allocated time"),
+                Err(err) => println!("Error timeout for the feedback to be sent"),
             }
-            for handle in handler{
-                handle.await.unwrap();
-            }
-            match Arc::try_unwrap(objects){
-                Ok(val)=>{
-                    let object=val.into_inner();
-                    let arm_unwrapped=Arc::try_unwrap(arm_status).unwrap();
-                    let objects_lock=Arc::new(Mutex::new((arm_unwrapped, object)));
-                    self.collect_data(objects_lock, sensor_send, counts).await;
-                },
-                Err(err) =>{
-                    println!("objects cannot be unwrapped:{:?}", err);
-                    return;
-                }
+        }
+    }
+    //handle the feedback back to the actuator
+    async fn handle_feedback(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>,feedback_recv: Receiver<ReadingType>, counts: Arc<AtomicI32>) {
+        let now=Instant::now();
+        let mut objects=Arc::new(Mutex::new(Vec::new()));
+        let mut arm_status=Arc::new(self.current_state);
+        let value=counts.load(Ordering::Acquire);
+        let mut handler=vec![];
+        for i in 0..value{
+            let object_copy=Arc::clone(&mut objects);
+            let feedback_recv_cloned=feedback_recv.clone();
+            let arm_status_cloned=Arc::clone(&mut arm_status);
+            let handle=task::spawn(async move{
+                let lock=object_copy.lock().await;
+                TransmissionChannel::recieve_transmission_deadline(now.into(), lock, arm_status_cloned, feedback_recv_cloned).await;
+                //TODO: Add timeout function
+            });
+            handler.push(handle);
+        }
+        for handle in handler{
+            handle.await.unwrap();
+        }
+        match Arc::try_unwrap(objects){
+            Ok(val)=>{
+                let object=val.into_inner();
+                let arm_unwrapped=Arc::try_unwrap(arm_status).unwrap();
+                let objects_lock=Arc::new(Mutex::new((arm_unwrapped, object)));
+                self.collect_data(objects_lock, sensor_send, counts).await;
+            },
+            Err(err) =>{
+                println!("objects cannot be unwrapped:{:?}", err);
+                return;
             }
         }
     }
