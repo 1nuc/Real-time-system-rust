@@ -39,11 +39,9 @@ async fn execute_tramission(size : i32){
 
 fn data_transmission(c: &mut Criterion){
     let mut group= c.benchmark_group("Data Transmission");
-    let runtime= Arc::new(Runtime::new().expect("unable to create a tokio runtime"));
     let scale=vec![10, 30, 50, 100];
     for size in scale.into_iter(){
-        let runtime_cloned=Arc::clone(&runtime);
-        let runtime=Arc::try_unwrap(runtime_cloned).expect("unable to unwrap the tokio runtime");
+        let runtime= Runtime::new().expect("unable to create a tokio runtime");
         group.bench_function(format!("data transmission, {:?} size",size), move |x|
             x.to_async(&runtime).iter(async|| {
                 execute_tramission(size).await;

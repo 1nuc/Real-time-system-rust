@@ -64,7 +64,7 @@ async fn handle_transmission(channel: Channel,counter: Arc<AtomicI32>, arm_data:
 async fn handle_feedback(consumer: Result<Consumer>)-> Vec<(Actual, Target,i32)>{
     let mut data_vec=vec![];
     loop{
-        match timeout(Duration::from_millis(200), consumer.clone().expect("Error retreiving the data").next()).await{
+        match timeout(Duration::from_millis(10), consumer.clone().expect("Error retreiving the data").next()).await{
             Ok(Some(msg))=>{
                 if let Ok(msg)=msg{
                     let ReadingType::RoboticArm(arm,object,id)=serde_json::from_slice::<ReadingType>(&(msg.data)).expect("Unable to serialize the data");
@@ -124,7 +124,7 @@ pub async fn sensor_control(channel: Channel, connection: Arc<Connection>){
     sensing(channel, packets, counter, Arc::clone(&connection)).await;
     let channel=create_channel(Arc::clone(&connection)).await;
     loop{
-        sleep(Duration::from_secs(1)).await;
+        sleep(Duration::from_millis(20)).await;
         if connection.status().state()!=ConnectionState::Connected{
             println!("All objects have been sent..server is closing");
             return;
