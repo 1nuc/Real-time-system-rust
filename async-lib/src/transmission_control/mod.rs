@@ -34,9 +34,7 @@ impl Control for TransmissionChannel{
           }, 
           Err(_) =>{
               "error while sending, thread run into fail safe mode...";
-              //TODO: Implementing fault tolerance mechanism Options:
-              //1. Checkpoints
-              //2. more concrete fail safe mode function 
+              return;
           }
        } 
     }
@@ -51,7 +49,6 @@ impl Control for TransmissionChannel{
                 Err(e)=> {
                    println!("Error in recieving the data: {e}");
                    None 
-                    //TODO: Some logic should be made to avoid channel collapse
                 },
             }
     }

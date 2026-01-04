@@ -49,7 +49,7 @@ impl<'a> Actuator<'a> for PID{
         let temparture=timeout(Duration::from_millis(1),task::spawn(async move{
             PID::calculate_pid(&mut current_arm_status.temperature,&mut object_status.temperature, "Temprature")
         }));
-// //TODO: processing Force
+// TODO: processing Force
         let force=timeout(Duration::from_millis(1),task::spawn(async move{
             PID::calculate_pid(&mut current_arm_status.force,&mut object_status.force,  "Force")
         }));
@@ -57,6 +57,7 @@ impl<'a> Actuator<'a> for PID{
         let velocity=timeout(Duration::from_millis(1),task::spawn(async move{
             PID::calculate_pid(&mut current_arm_status.velocity,&mut object_status.velocity,  "Velocity")
         }));
+        //use tokio try join to check if the deadline is satisfied
         match try_join!(position, temparture, force, velocity){
             Ok(val)=>{
                 println!("deadline is satisfied");
@@ -67,8 +68,6 @@ impl<'a> Actuator<'a> for PID{
                 return;
             }
         }
-
-
         drop(lock);
     }
 

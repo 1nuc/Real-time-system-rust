@@ -18,6 +18,7 @@ impl Shared for Readings{
     type SharedLock<'a>=MutexGuard<'a, (Actual,Vec<(Target,String, i32)>)>;
     type Type= Arc<Mutex<(Actual,Vec<(Target,String, i32)>)>>;
 }
+
 #[allow(non_snake_case, unused_variables)]
 impl Sensing for Readings{
     async fn sensor_control(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>,feedback_recv: Receiver<ReadingType>, counts: Arc<AtomicI32>) {
