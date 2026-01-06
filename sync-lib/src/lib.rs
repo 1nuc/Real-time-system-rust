@@ -17,14 +17,14 @@ pub trait ActuatorSync <'a>: Shared{
     fn process_feedback(pos: f32, temparture: f32, force: f32, vel: f32, id: i32, robotic_data: Readings, feedback_send: Sender<ReadingType>, counts: Arc<AtomicI32>);
 }
 pub trait SensingSync: Shared{
-    fn collect_data(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>, counts: Arc<AtomicI32>);
+    fn collect_data(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>, counts: Arc<AtomicI32>, time: u64);
     fn sensor_control(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>, feedback_recv: Receiver<ReadingType>, counts: Arc<AtomicI32>);
-    fn sensor_workflow(packets: Self::Type, tx_copy: Sender<ReadingType>);
+    fn sensor_workflow(packets: Self::Type, tx_copy: Sender<ReadingType>, time: u64);
 }
 pub trait ControlSync: Shared{
     fn init()-> Self;
     fn simulation_control(self, boxes_num: i32);
-    fn transmit_data<'a>(data: ReadingType, sensor_send: Sender<ReadingType>, lock: Self::SharedLock<'a>);
+    fn transmit_data<'a>(data: ReadingType, sensor_send: Sender<ReadingType>, lock: Self::SharedLock<'a>, time: u64);
     fn recieve_transmission(sensor_recv: Receiver<ReadingType>)->Option<ReadingType>;
     fn recieve_transmission_deadline(now: Instant,object_lock:MutexGuard<Vec<(Target, String, i32)>>, arm_status: Arc<Actual>,feedback_recv: Receiver<ReadingType>);
 } 

@@ -73,7 +73,7 @@ impl<'a> ActuatorSync<'a> for PID{
        let updated_readings= robotic_data.update_indices(id_deleted, updated_arm_status);
        let sensing_info= Arc::new(Mutex::new((updated_readings.current_state, updated_readings.objects.clone())));
        counts.fetch_sub(1, Ordering::Release);
-       robotic_data.collect_data(sensing_info, feedback_send, counts);
+       robotic_data.collect_data(sensing_info, feedback_send, counts, 500);
     }
 }
 

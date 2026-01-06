@@ -25,14 +25,14 @@ impl ControlSync for TransmissionChannel{
         }
     } 
 
-    fn transmit_data<'a>(data: ReadingType, sensor_send: Sender<ReadingType>, lock: Self::SharedLock<'a>){
-       match sensor_send.send(data){
+    fn transmit_data<'a>(data: ReadingType, sensor_send: Sender<ReadingType>, lock: Self::SharedLock<'a>, time: u64){
+       match sensor_send.send_timeout(data, Duration::from_micros(time)){
           Ok(_)=>{
             println!("Sending Target details...");
             drop(lock);
           }, 
           Err(_) =>{
-              "error while sending, thread run into fail safe mode...";
+              "Deadline violated";
               return
           }
        } 
