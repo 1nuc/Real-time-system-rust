@@ -26,7 +26,7 @@ impl Sensing for Readings{
             self.collect_data(sensing_info ,sensor_send, counts).await;
         }
         else{
-            match timeout(Duration::from_millis(5), self.handle_feedback(sensing_info, sensor_send, feedback_recv, counts)).await{
+            match timeout(Duration::from_micros(500), self.handle_feedback(sensing_info, sensor_send, feedback_recv, counts)).await{
                 Ok(ok)=> println!("Feedback is sent in the allocated time"),
                 Err(err) => println!("Error timeout for the feedback to be sent.. entering fail safe mode .."),
             }
@@ -35,14 +35,14 @@ impl Sensing for Readings{
     //handle the feedback back to the actuator
     async fn handle_feedback(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>,feedback_recv: Receiver<ReadingType>, counts: Arc<AtomicI32>) {
         let now=Instant::now();
-        let mut objects=Arc::new(Mutex::new(Vec::new()));
-        let mut arm_status=Arc::new(self.current_state);
+        let objects=Arc::new(Mutex::new(Vec::new()));
+        let arm_status=Arc::new(self.current_state);
         let value=counts.load(Ordering::Acquire);
         let mut handler=vec![];
         for i in 0..value{
-            let object_copy=Arc::clone(&mut objects);
+            let object_copy=Arc::clone(&objects);
             let feedback_recv_cloned=feedback_recv.clone();
-            let arm_status_cloned=Arc::clone(&mut arm_status);
+            let arm_status_cloned=Arc::clone(&arm_status);
             let handle=task::spawn(async move{
                 let lock=object_copy.lock().await;
                 TransmissionChannel::recieve_transmission_deadline(now.into(), lock, arm_status_cloned, feedback_recv_cloned).await;
@@ -90,11 +90,14 @@ impl Sensing for Readings{
         let mut data=packets.lock().await;
         match data.1.pop(){
             Some(value) =>{
-                TransmissionChannel::transmit_data(ReadingType::RoboticArm(data.0, value.0, value.2), tx_copy, data).await;
+                match timeout(Duration::from_micros(100),TransmissionChannel::transmit_data(ReadingType::RoboticArm(data.0, value.0, value.2),tx_copy, data)).await{
+                    Ok(ok) => println!("Data is transmitted in the allocated time bound"),
+                    Err(err)=>{
+                        println!("Deadline is violated.. recovery mechanism is ON");
+                    }
+                }
             },
             None =>{
-                drop(tx_copy);
-                drop(data);
                 return
             },
         }

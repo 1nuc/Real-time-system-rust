@@ -84,7 +84,10 @@ impl<'a> Actuator<'a> for PID{
             return;
        }
        println!("remaining objects: {:?}", counts);
-       robotic_data.collect_data(sensing_info, feedback_send, counts).await;
+       match timeout(Duration::from_micros(500),robotic_data.collect_data(sensing_info, feedback_send, counts)).await{
+           Ok(_val)=>println!("Feedback is sent in the allocated deadline"),
+           Err(_err)=> println!("Deadline is voilated"),
+       }
     }
 }
 
