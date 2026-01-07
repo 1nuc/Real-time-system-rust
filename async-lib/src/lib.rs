@@ -31,5 +31,5 @@ pub trait Control: Shared{
     async fn simulation_control(self, boxes_num: i32);
     async fn transmit_data<'a>(data: ReadingType, sensor_send: Sender<ReadingType>, lock: Self::SharedLock<'a>);
     async fn recieve_transmission(sensor_recv: Receiver<ReadingType>)->Option<ReadingType>;
-    async fn recieve_transmission_deadline<'a>(now: Instant,object_lock:MutexGuard<'a,Vec<(Target, String, i32)>>, arm_status: Arc<Actual>,feedback_recv: Receiver<ReadingType>);
+    async fn recieve_transmission_feedback<'a>(now: Instant,object_lock:MutexGuard<'a,Vec<(Target, String, i32)>>, feedback_recv: Receiver<ReadingType>) -> Option<Actual>;
 } 

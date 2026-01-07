@@ -43,7 +43,9 @@ impl Control for TransmissionChannel{
 {
             match sensor_recv.recv_async().await{
                 Ok(value) => {
-                    println!("Readings recieved...");
+                    while ! sensor_recv.is_empty(){
+                        let _=sensor_recv.recv_async().await.unwrap();
+                    }
                     Some(value)
                 },
                 Err(e)=> {
@@ -52,21 +54,21 @@ impl Control for TransmissionChannel{
                 },
             }
     }
-    async fn recieve_transmission_deadline<'a>(now: Instant, mut data:MutexGuard<'a,Vec<(Target, String, i32)>>, mut arm_status: Arc<Actual>,feedback_recv: Receiver<ReadingType>){
+    async fn recieve_transmission_feedback<'a>(now: Instant, mut data:MutexGuard<'a,Vec<(Target, String, i32)>>,  feedback_recv: Receiver<ReadingType>) -> Option<Actual>{
         let token=<Readings as Actions>::TOKEN.to_string();
         // match feedback_recv.recv_deadline(now + Duration::from_millis(500)){
         match feedback_recv.recv_async().await{
             Ok(value) =>{
                 let ReadingType::RoboticArm(arm, remaining_objects, id)=value;
-                *Arc::make_mut(&mut arm_status)=arm.into();
                 data.push((remaining_objects,token, id));
                 drop(data);
+                Some(arm)
             },
             Err(e)=> {
                 println!("Error In receiving, {:?}", e);
+                None
             }
         }
-        drop(feedback_recv);
     }
 
     async fn simulation_control(self, boxes_num: i32){

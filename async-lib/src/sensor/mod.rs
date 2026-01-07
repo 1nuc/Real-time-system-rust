@@ -36,28 +36,27 @@ impl Sensing for Readings{
     async fn handle_feedback(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>,feedback_recv: Receiver<ReadingType>, counts: Arc<AtomicI32>) {
         let now=Instant::now();
         let objects=Arc::new(Mutex::new(Vec::new()));
-        let arm_status=Arc::new(self.current_state);
         let value=counts.load(Ordering::Acquire);
         let mut handler=vec![];
         for i in 0..value{
             let object_copy=Arc::clone(&objects);
             let feedback_recv_cloned=feedback_recv.clone();
-            let arm_status_cloned=Arc::clone(&arm_status);
             let handle=task::spawn(async move{
                 let lock=object_copy.lock().await;
-                TransmissionChannel::recieve_transmission_deadline(now.into(), lock, arm_status_cloned, feedback_recv_cloned).await;
-                //TODO: Add timeout function
+                TransmissionChannel::recieve_transmission_feedback(now.into(), lock, feedback_recv_cloned).await
             });
             handler.push(handle);
         }
+        let mut arm_status=self.current_state;
         for handle in handler{
-            handle.await.unwrap();
+            if let Some(arm)=handle.await.unwrap(){
+                arm_status=arm;
+            }
         }
         match Arc::try_unwrap(objects){
             Ok(val)=>{
                 let object=val.into_inner();
-                let arm_unwrapped=Arc::try_unwrap(arm_status).unwrap();
-                let objects_lock=Arc::new(Mutex::new((arm_unwrapped, object)));
+                let objects_lock=Arc::new(Mutex::new((arm_status, object)));
                 self.collect_data(objects_lock, sensor_send, counts).await;
             },
             Err(err) =>{
@@ -71,7 +70,7 @@ impl Sensing for Readings{
     async fn collect_data(&self, sensing_info: Self::Type, sensor_send: Sender<ReadingType>, counts: Arc<AtomicI32>) {
         let value=counts.load(Ordering::Acquire);
         let mut handler=vec![];
-        for _ in 0..=value{
+        for _ in 0..value{
             let tx_copy=sensor_send.clone();
             let packets=Arc::clone(&sensing_info);
             let handle=task::spawn(async move {
