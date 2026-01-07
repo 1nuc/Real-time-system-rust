@@ -51,18 +51,18 @@ impl ControlSync for TransmissionChannel{
                 },
             }
     }
-    fn recieve_transmission_deadline(now: Instant, mut data:MutexGuard<Vec<(Target, String, i32)>>, mut arm_status: Arc<Actual>,feedback_recv: Receiver<ReadingType>){
+    fn recieve_transmission_deadline(now: Instant, mut data:MutexGuard<Vec<(Target, String, i32)>>, feedback_recv: Receiver<ReadingType>) -> Option<Actual>{
         let token=<Readings as Actions>::TOKEN.to_string();
         match feedback_recv.recv_deadline(now + Duration::from_micros(500)){
             Ok(value) =>{
                 let ReadingType::RoboticArm(arm, remaining_objects, id)=value;
-                *Arc::make_mut(&mut arm_status)=arm.into();
                 data.push((remaining_objects,token, id));
                 drop(data);
+                Some(arm)
             },
             Err(RecvTimeoutError)=>{
                  println!("deadline passed for thread..recovery mode is On");
-                 return
+                 None
             }
         }
     }

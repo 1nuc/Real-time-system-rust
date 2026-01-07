@@ -23,23 +23,24 @@ impl SensingSync for Readings{
         }
         else{
             let now=Instant::now();
-            let mut objects=Arc::new(Mutex::new(Vec::new()));
-            let mut arm_status=Arc::new(self.current_state);
+            let objects=Arc::new(Mutex::new(Vec::new()));
+            let mut arm_status=self.current_state;
             while !feedback_recv.is_empty(){
-                let object_copy=Arc::clone(&mut objects);
+                let object_copy=Arc::clone(&objects);
                 let feedback_recv_cloned=feedback_recv.clone();
-                let arm_status_cloned=Arc::clone(&mut arm_status);
-                thread::spawn(move||{
+                let arm=thread::spawn(move||{
                     let lock=object_copy.lock().expect("unable to lock");
-                    TransmissionChannel::recieve_transmission_deadline(now, lock, arm_status_cloned, feedback_recv_cloned);
-                });
+                    TransmissionChannel::recieve_transmission_deadline(now, lock, feedback_recv_cloned)
+                }).join().expect("unable to get the value");
+                if let Some(val)=arm{
+                    arm_status=val;
+                }
             }
             match Arc::try_unwrap(objects){
                 Ok(val)=>{
                     println!("Objects are safe");
                     let object=val.into_inner().unwrap();
-                    let arm_unwrapped=Arc::try_unwrap(arm_status).unwrap();
-                    let objects_lock=Arc::new(Mutex::new((arm_unwrapped, object)));
+                    let objects_lock=Arc::new(Mutex::new((arm_status, object)));
                     self.collect_data(objects_lock, sensor_send, counts, 100);
                 },
                 Err(err) =>println!("objects cannot be unwrapped:{:?}", err),
@@ -50,7 +51,7 @@ impl SensingSync for Readings{
     // Collect data in the initial state
     fn collect_data(&self, sensing_info: Self::Type, sensor_send: Sender<ReadingType>, counts: Arc<AtomicI32>, time: u64) {
         let value=counts.load(Ordering::Acquire);
-        for _ in 0..=value{
+        for _ in 0..value{
             let tx_copy=sensor_send.clone();
             let packets=Arc::clone(&sensing_info);
             thread::spawn(move ||{
