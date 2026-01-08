@@ -33,8 +33,7 @@ impl Control for TransmissionChannel{
             drop(lock);
           }, 
           Err(_) =>{
-              "error while sending, thread run into fail safe mode...";
-              return;
+              println!("error while sending, thread run into fail safe mode...");
           }
        } 
     }

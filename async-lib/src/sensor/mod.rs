@@ -61,7 +61,6 @@ impl Sensing for Readings{
             },
             Err(err) =>{
                 println!("objects cannot be unwrapped:{:?}", err);
-                return;
             }
         }
     }
@@ -87,18 +86,15 @@ impl Sensing for Readings{
     //start threads to send the data through packets
     async fn sensor_workflow(packets: Self::Type, tx_copy: Sender<ReadingType>){
         let mut data=packets.lock().await;
-        match data.1.pop(){
-            Some(value) =>{
+        if let Some(value)= data.1.pop(){
                 match timeout(Duration::from_micros(100),TransmissionChannel::transmit_data(ReadingType::RoboticArm(data.0, value.0, value.2),tx_copy, data)).await{
                     Ok(ok) => println!("Data is transmitted in the allocated time bound"),
                     Err(err)=>{
                         println!("Deadline is violated.. recovery mechanism is ON");
                     }
                 }
-            },
-            None =>{
-                return
-            },
+        }else{
+            println!("all values have been submitted");
         }
     }
 
