@@ -13,7 +13,7 @@ fn sync_benchmarker(size: i32){
     ts_control.simulation_control(size);
 }
 
-fn cpu_load_sync(){
+fn cpu_load(){
     let mut arr=vec![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
      while let Some(mut i) =arr.pop(){
         thread::spawn(move ||{
@@ -26,25 +26,10 @@ fn cpu_load_sync(){
         });
     }
 }
-async fn cpu_load_async(){
-    let mut arr=vec![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
-    while let Some(mut i) =arr.pop(){
-        tokio::task::spawn(async move {
-            println!("popped value :{}", i);
-            loop{
-               i+=1; 
-               black_box(i);
-               let _=tokio::time::sleep(tokio::time::Duration::from_micros(1));
-            }
-        });
-    }
-}
 
 fn async_load(c: &mut Criterion){
     let runtime=Runtime::new().expect("unable to create tokio runtime"); 
-    runtime.block_on(async{
-        cpu_load_async().await;
-    });
+    cpu_load();
     c.bench_function("async version with cpu load", |x|x.to_async(&runtime).iter(||async{
                 async_benchmarker(50).await;
         }),
@@ -52,7 +37,7 @@ fn async_load(c: &mut Criterion){
 }
 
 fn sync_load(c: &mut Criterion){
-    cpu_load_sync();
+    cpu_load();
     c.bench_function("sync version with cpu load ", |x|x.iter(||{
         sync_benchmarker(50);
     }));
