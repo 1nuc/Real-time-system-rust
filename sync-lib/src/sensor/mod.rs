@@ -64,15 +64,12 @@ impl SensingSync for Readings{
     //start threads to send the data through packets
     fn sensor_workflow(packets: Self::Type, tx_copy: Sender<ReadingType>, time: u64){
         let mut data=packets.lock().expect("error while locking");
-        match data.1.pop(){
-            Some(value) =>{
-                TransmissionChannel::transmit_data(ReadingType::RoboticArm(data.0, value.0, value.2), tx_copy, data, time);
-            },
-            None =>{
-                drop(tx_copy);
-                drop(data);
-                return
-            },
+        if let Some(value)=data.1.pop(){
+            TransmissionChannel::transmit_data(ReadingType::RoboticArm(data.0, value.0, value.2), tx_copy, data, time);
+        }else{
+            println!("all values have been submitted");
+            drop(tx_copy);
+            drop(data);
         }
     }
 

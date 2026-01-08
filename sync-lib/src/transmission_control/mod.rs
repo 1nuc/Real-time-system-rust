@@ -32,8 +32,7 @@ impl ControlSync for TransmissionChannel{
             drop(lock);
           }, 
           Err(_) =>{
-              "Deadline violated";
-              return
+              println!("Deadline violated");
           }
        } 
     }
