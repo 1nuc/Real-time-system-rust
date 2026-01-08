@@ -11,9 +11,9 @@
 
 ## Production Steps
 ### Requirements: Download Docker-compose
-`sudo apt/dnf install docker-compose`
-`cd rust_mq`
-`docker compose up -d`
+`sudo apt/dnf install docker-compose`<br>
+`cd rust_mq`<br>
+`docker compose up -d`<br>
 ### Running benches
 `cd Main`
 `cargo b`
