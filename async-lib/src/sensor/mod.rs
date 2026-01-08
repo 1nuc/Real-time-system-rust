@@ -26,9 +26,17 @@ impl Sensing for Readings{
             self.collect_data(sensing_info ,sensor_send, counts).await;
         }
         else{
-            match timeout(Duration::from_micros(500), self.handle_feedback(sensing_info, sensor_send, feedback_recv, counts)).await{
+            match timeout(Duration::from_micros(500), self.handle_feedback(sensing_info, sensor_send.clone(), feedback_recv.clone(), counts.clone())).await{
                 Ok(ok)=> println!("Feedback is sent in the allocated time"),
-                Err(err) => println!("Error timeout for the feedback to be sent.. entering fail safe mode .."),
+                Err(err) =>{
+                     println!("Error timeout for the feedback to be sent.. entering fail safe mode ..");
+                     drop(sensor_send);
+                     while ! feedback_recv.is_empty(){
+                         println!("draining channel");
+                         let _=feedback_recv.recv_async().await;
+                     }
+                     counts.store(0, Ordering::Release);
+                }
             }
         }
     }
@@ -94,7 +102,7 @@ impl Sensing for Readings{
                     }
                 }
         }else{
-            println!("all values have been submitted");
+            // println!("all values have been submitted")
         }
     }
 
