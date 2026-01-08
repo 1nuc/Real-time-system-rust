@@ -15,6 +15,6 @@
 `cd rust_mq`<br>
 `docker compose up -d`<br>
 ### Running benches
-`cd Main`
-`cargo b`
-`cargo bench`
+`cd Main`<br>
+`cargo b`<br>
+`cargo bench`<br>
