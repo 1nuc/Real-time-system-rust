@@ -24,15 +24,12 @@ impl<'a> ActuatorSync<'a> for PID{
             let feedback_send_cloned=feedback_send.clone();
             let robotic_data_cloned=robotic_data.clone();
             thread::spawn(move || {
-                match TransmissionChannel::recieve_transmission(sensor_recv_cloned){
-                    Some(val)=>{
+                if let Some(val)=TransmissionChannel::recieve_transmission(sensor_recv_cloned){
                         let lock=receiver_lock.lock().unwrap();
                         let ReadingType::RoboticArm(arm, object, id)=val;
                         println!("object Id: {:?} Received", id);
                         Self::process_singals(lock, arm, object, id, feedback_send_cloned, robotic_data_cloned, counts);
-                    },
-                    None => (),
-                } 
+                }
             });
         }
     }
