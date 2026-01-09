@@ -102,7 +102,7 @@ impl Sensing for Readings{
                     }
                 }
         }else{
-            // println!("all values have been submitted")
+            println!("all values have been submitted")
         }
     }
 
