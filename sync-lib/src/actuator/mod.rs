@@ -18,20 +18,27 @@ impl Shared for PID{
 impl<'a> ActuatorSync<'a> for PID{
     fn actuator_control(sensing_info: Self::Type,sensor_recv: Receiver<ReadingType>,
         counts: Arc<AtomicI32>, feedback_send: Sender<ReadingType>, robotic_data: Readings) {
-        if !sensor_recv.is_empty(){
-            let receiver_lock=Arc::clone(&sensing_info);
-            let sensor_recv_cloned=sensor_recv.clone();
-            let feedback_send_cloned=feedback_send.clone();
-            let robotic_data_cloned=robotic_data.clone();
-            thread::spawn(move || {
-                if let Some(val)=TransmissionChannel::recieve_transmission(sensor_recv_cloned){
-                        let lock=receiver_lock.lock().unwrap();
-                        let ReadingType::RoboticArm(arm, object, id)=val;
-                        println!("object Id: {:?} Received", id);
-                        Self::process_singals(lock, arm, object, id, feedback_send_cloned, robotic_data_cloned, counts);
+            if !sensor_recv.is_empty(){
+                let value=counts.load(Ordering::Acquire);
+                for _ in 0..value{
+                    let receiver_lock=Arc::clone(&sensing_info);
+                    let sensor_recv_cloned=sensor_recv.clone();
+                    let feedback_send_cloned=feedback_send.clone();
+                    let robotic_data_cloned=robotic_data.clone();
+                    thread::spawn(move || {
+                        match TransmissionChannel::recieve_transmission(sensor_recv_cloned){
+                            Some(val)=>{
+                                let lock=receiver_lock.lock().unwrap();
+                                let ReadingType::RoboticArm(arm, object, id)=val;
+                                println!("object Id: {:?} Received", id);
+                                Self::process_singals(lock, arm, object, id, feedback_send_cloned, robotic_data_cloned, counts);
+                            },
+                            None => (),
+                        } 
+                    });
+                    return;
                 }
-            });
-        }
+            }
     }
 
     fn process_singals(lock: Self::SharedLock<'a>, mut current_arm_status: Actual, mut object_status: Target,

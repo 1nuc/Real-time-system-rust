@@ -24,18 +24,14 @@ impl Sensing for Readings{
     async fn sensor_control(&self, sensing_info: Self::Type,sensor_send: Sender<ReadingType>,feedback_recv: Receiver<ReadingType>, counts: Arc<AtomicI32>) {
         if feedback_recv.is_empty(){
             self.collect_data(sensing_info ,sensor_send, counts).await;
-        }
-        else{
+        } else{ 
             match timeout(Duration::from_micros(500), self.handle_feedback(sensing_info, sensor_send.clone(), feedback_recv.clone(), counts.clone())).await{
                 Ok(ok)=> println!("Feedback is sent in the allocated time"),
                 Err(err) =>{
                      println!("Error timeout for the feedback to be sent.. entering fail safe mode ..");
                      drop(sensor_send);
-                     while ! feedback_recv.is_empty(){
-                         println!("draining channel");
-                         let _=feedback_recv.recv_async().await;
-                     }
-                     counts.store(0, Ordering::Release);
+                     drop(feedback_recv);
+                     counts.store(1, Ordering::Release);
                 }
             }
         }
